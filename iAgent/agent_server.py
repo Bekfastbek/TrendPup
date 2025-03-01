@@ -1,5 +1,6 @@
-from openai import OpenAI
+from mistralai.client import MistralClient
 import os
+import traceback
 from dotenv import load_dotenv
 from quart import Quart, request, jsonify
 from datetime import datetime
@@ -14,29 +15,25 @@ import asyncio
 from hypercorn.config import Config
 from hypercorn.asyncio import serve
 import aiohttp
+import pandas as pd
+from glob import glob
 
-# Initialize Quart app (async version of Flask)
 app = Quart(__name__)
 
 
 class InjectiveChatAgent:
     def __init__(self):
-        # Load environment variables
         load_dotenv()
 
-        # Get API key from environment variable
-        self.api_key = os.getenv("OPENAI_API_KEY")
+        self.api_key = os.getenv("MISTRAL_API_KEY")
         if not self.api_key:
             raise ValueError(
-                "No OpenAI API key found. Please set the OPENAI_API_KEY environment variable."
+                "No Mistral API key found. Please set the MISTRAL_API_KEY environment variable."
             )
 
-        # Initialize OpenAI client
-        self.client = OpenAI(api_key=self.api_key)
+        self.client = MistralClient(api_key = self.api_key)
 
-        # Initialize conversation histories
         self.conversations = {}
-        # Initialize injective agents
         self.agents = {}
         schema_paths = [
             "./injective_functions/account/account_schema.json",
@@ -51,19 +48,17 @@ class InjectiveChatAgent:
         self.function_schemas = FunctionSchemaLoader.load_schemas(schema_paths)
 
     async def initialize_agent(
-        self, agent_id: str, private_key: str, environment: str = "mainnet"
+            self, agent_id: str, private_key: str, environment: str = "mainnet"
     ) -> None:
-        """Initialize Injective clients if they don't exist"""
         if agent_id not in self.agents:
             clients = await InjectiveClientFactory.create_all(
-                private_key=private_key, network_type=environment
+                private_key = private_key, network_type = environment
             )
             self.agents[agent_id] = clients
 
     async def execute_function(
-        self, function_name: str, arguments: dict, agent_id: str
+            self, function_name: str, arguments: dict, agent_id: str
     ) -> dict:
-        """Execute the appropriate Injective function with error handling"""
         try:
             # Get the client dictionary for this agent
             clients = self.agents.get(agent_id)
@@ -73,7 +68,7 @@ class InjectiveChatAgent:
                 }
 
             return await FunctionExecutor.execute_function(
-                clients=clients, function_name=function_name, arguments=arguments
+                clients = clients, function_name = function_name, arguments = arguments
             )
 
         except Exception as e:
@@ -84,150 +79,144 @@ class InjectiveChatAgent:
             }
 
     async def get_response(
-        self,
-        message,
-        session_id="default",
-        private_key=None,
-        agent_id=None,
-        environment="mainnet",
+            self,
+            message,
+            session_id = "default",
+            private_key = None,
+            agent_id = None,
+            environment = "mainnet",
     ):
-        """Get response from OpenAI API."""
         await self.initialize_agent(
-            agent_id=agent_id, private_key=private_key, environment=environment
+            agent_id = agent_id, private_key = private_key, environment = environment
         )
         print("initialized agents")
         try:
-            # Initialize conversation history for new sessions
             if session_id not in self.conversations:
                 self.conversations[session_id] = []
 
-            # Add user message to conversation history
             self.conversations[session_id].append({"role": "user", "content": message})
 
-            # Get response from OpenAI
-            response = await asyncio.to_thread(
-                self.client.chat.completions.create,
-                model="gpt-4o",
-                messages=[
-                    {
-                        "role": "system",
-                        "content": """You are a helpful AI assistant on Injective Chain. 
-                    You will be answering all things related to injective chain, and help out with
-                    on-chain functions.
-                    
-                    When handling market IDs, always use these standardized formats:
-                    - For BTC perpetual: "BTC/USDT PERP" maps to "btcusdt-perp"
-                    - For ETH perpetual: "ETH/USDT PERP" maps to "ethusdt-perp"
-                    
-                    When users mention markets:
-                    1. If they use casual terms like "Bitcoin perpetual" or "BTC perp", interpret it as "BTC/USDT PERP"
-                    2. If they mention "Ethereum futures" or "ETH perpetual", interpret it as "ETH/USDT PERP"
-                    3. Always use the standardized format in your responses
-                    
-                    Before performing any action:
-                    1. Describe what you're about to do
-                    2. Ask for explicit confirmation
-                    3. Only proceed after receiving a "yes"
-                    
-                    When making function calls:
-                    1. Convert the standardized format (e.g., "BTC/USDT PERP") to the internal format (e.g., "btcusdt-perp")
-                    2. When displaying results to users, convert back to the standard format
-                    3. Always confirm before executing any functions
-                    
-                    For general questions, provide informative responses.
-                    When users want to perform actions, describe the action and ask for confirmation but for fetching data you dont have to ask for confirmation.""",
-                    }
-                ]
-                + self.conversations[session_id],
-                functions=self.function_schemas,
-                function_call="auto",
-                max_tokens=2000,
-                temperature=0.7,
-            )
+            system_message = {
+                "role": "system",
+                "content": """You are a helpful AI assistant on Injective Chain. 
+                You will be answering all things related to injective chain, and help out with
+                on-chain functions.
 
-            response_message = response.choices[0].message
-            print(response_message)
-            # Handle function calling
-            if (
-                hasattr(response_message, "function_call")
-                and response_message.function_call
-            ):
-                # Extract function details
-                function_name = response_message.function_call.name
-                function_args = json.loads(response_message.function_call.arguments)
-                # Execute the function
-                function_response = await self.execute_function(
-                    function_name, function_args, agent_id
+                When handling market IDs, always use these standardized formats:
+                - For BTC perpetual: "BTC/USDT PERP" maps to "btcusdt-perp"
+                - For ETH perpetual: "ETH/USDT PERP" maps to "ethusdt-perp"
+
+                When users mention markets:
+                1. If they use casual terms like "Bitcoin perpetual" or "BTC perp", interpret it as "BTC/USDT PERP"
+                2. If they mention "Ethereum futures" or "ETH perpetual", interpret it as "ETH/USDT PERP"
+                3. Always use the standardized format in your responses
+
+                Before performing any action:
+                1. Describe what you're about to do
+                2. Ask for explicit confirmation
+                3. Only proceed after receiving a "yes"
+
+                When making function calls:
+                1. Convert the standardized format (e.g., "BTC/USDT PERP") to the internal format (e.g., "btcusdt-perp")
+                2. When displaying results to users, convert back to the standard format
+                3. Always confirm before executing any functions
+
+                For general questions, provide informative responses.
+                When users want to perform actions, describe the action and ask for confirmation but for fetching data you dont have to ask for confirmation."""
+            }
+
+            print("Preparing to send request to chat model...")
+            print(f"Messages being sent: {[system_message] + self.conversations[session_id]}")
+            print(f"Tools being sent: {self.function_schemas}")
+
+            try:
+                print("Sending request to chat model...")
+                response = await asyncio.to_thread(
+                    self.client.chat,
+                    model = "mistral-large-latest",
+                    messages = [system_message] + self.conversations[session_id],
+                    tools = self.function_schemas,
+                    tool_choice = "auto",
+                    max_tokens = 2000,
+                    temperature = 0.7,
                 )
+                print("Raw response received:", response)
+                print("Response type:", type(response))
+                print("Response attributes:", dir(response))
 
-                # Add function call and response to conversation
-                self.conversations[session_id].append(
-                    {
+                if not hasattr(response, 'choices') or not response.choices:
+                    raise ValueError("No choices in response")
+
+                response_message = response.choices[0].message
+                print("Response message:", response_message)
+                print("Response message type:", type(response_message))
+                print("Response message attributes:", dir(response_message))
+
+                # Handle tool calls if they exist
+                tool_calls = getattr(response_message, 'tool_calls', None)
+                function_call = None
+
+                if tool_calls:
+                    print("Tool calls found:", tool_calls)
+                    print("Tool calls type:", type(tool_calls))
+
+                    if isinstance(tool_calls, list) and tool_calls:
+                        tool_call = tool_calls[0]
+                        print("First tool call:", tool_call)
+                        print("Tool call attributes:", dir(tool_call))
+
+                        function_call = {
+                            "id": str(uuid.uuid4()),
+                            "type": "function",
+                            "function": {
+                                "name": getattr(tool_call.function, 'name', 'unknown'),
+                                "arguments": getattr(tool_call.function, 'arguments', '{}')
+                            }
+                        }
+
+                        # Add function call to conversation history
+                        self.conversations[session_id].append({
+                            "role": "assistant",
+                            "content": None,
+                            "function_call": function_call
+                        })
+
+                # Handle regular message content
+                content = getattr(response_message, 'content', None)
+                if content:
+                    self.conversations[session_id].append({
                         "role": "assistant",
-                        "content": None,
-                        "function_call": {
-                            "name": function_name,
-                            "arguments": json.dumps(function_args),
-                        },
+                        "content": content
+                    })
+
+                # If we have either content or function call, return them
+                if content or function_call:
+                    return {
+                        "response": content,
+                        "function_call": function_call,
+                        "session_id": session_id,
                     }
-                )
 
-                self.conversations[session_id].append(
-                    {
-                        "role": "function",
-                        "name": function_name,
-                        "content": json.dumps(function_response),
-                    }
-                )
-
-                # Get final response
-                second_response = await asyncio.to_thread(
-                    self.client.chat.completions.create,
-                    model="gpt-4-turbo-preview",
-                    messages=self.conversations[session_id],
-                    max_tokens=2000,
-                    temperature=0.7,
-                )
-
-                final_response = second_response.choices[0].message.content.strip()
-                self.conversations[session_id].append(
-                    {"role": "assistant", "content": final_response}
-                )
-
-                return {
-                    "response": final_response,
-                    "function_call": {
-                        "name": function_name,
-                        "result": function_response,
-                    },
-                    "session_id": session_id,
-                }
-
-            # Handle regular response
-            bot_message = response_message.content
-            if bot_message:
-                self.conversations[session_id].append(
-                    {"role": "assistant", "content": bot_message}
-                )
-
-                return {
-                    "response": bot_message,
-                    "function_call": None,
-                    "session_id": session_id,
-                }
-            else:
-                default_response = "I'm here to help you with trading on Injective Chain. You can ask me about trading, checking balances, making transfers, or staking. How can I assist you today?"
-                self.conversations[session_id].append(
-                    {"role": "assistant", "content": default_response}
-                )
-
+                # Default response if no content or function call
+                default_response = "I'm here to help you with trading on Injective Chain. How can I assist you today?"
+                self.conversations[session_id].append({
+                    "role": "assistant",
+                    "content": default_response
+                })
                 return {
                     "response": default_response,
                     "function_call": None,
                     "session_id": session_id,
                 }
 
+            except Exception as chat_error:
+                print(f"Chat error details: {type(chat_error).__name__}: {str(chat_error)}")
+                print(f"Chat error traceback: {traceback.format_exc()}")
+                raise chat_error
+
         except Exception as e:
+            print(f"Error details: {type(e).__name__}: {str(e)}")
+            print(f"Full traceback: {traceback.format_exc()}")
             error_response = f"I apologize, but I encountered an error: {str(e)}. How else can I help you?"
             return {
                 "response": error_response,
@@ -235,21 +224,29 @@ class InjectiveChatAgent:
                 "session_id": session_id,
             }
 
-    def clear_history(self, session_id="default"):
+    def clear_history(self, session_id = "default"):
         """Clear conversation history for a specific session."""
         if session_id in self.conversations:
             self.conversations[session_id].clear()
 
-    def get_history(self, session_id="default"):
+    def get_history(self, session_id = "default"):
+        """Get conversation history for a specific session."""
+        return self.conversations.get(session_id, [])
+
+    def clear_history(self, session_id = "default"):
+        """Clear conversation history for a specific session."""
+        if session_id in self.conversations:
+            self.conversations[session_id].clear()
+
+    def get_history(self, session_id = "default"):
         """Get conversation history for a specific session."""
         return self.conversations.get(session_id, [])
 
 
-# Initialize chat agent
 agent = InjectiveChatAgent()
 
 
-@app.route("/ping", methods=["GET"])
+@app.route("/ping", methods = ["GET"])
 async def ping():
     """Health check endpoint"""
     return jsonify(
@@ -257,11 +254,12 @@ async def ping():
     )
 
 
-@app.route("/chat", methods=["POST"])
+@app.route("/chat", methods = ["POST"])
 async def chat_endpoint():
-    """Main chat endpoint"""
-    data = await request.get_json()
     try:
+        data = await request.get_json()
+        print("Received data:", data)
+
         if not data or "message" not in data:
             return (
                 jsonify(
@@ -280,12 +278,19 @@ async def chat_endpoint():
         session_id = data.get("session_id", "default")
         private_key = data.get("agent_key", "default")
         agent_id = data.get("agent_id", "default")
+
         response = await agent.get_response(
             data["message"], session_id, private_key, agent_id
         )
 
         return jsonify(response)
     except Exception as e:
+
+        import traceback
+        print(f"Error occurred: {str(e)}")
+        print(f"Error type: {type(e)}")
+        print(f"Traceback: {traceback.format_exc()}")
+
         return (
             jsonify(
                 {
@@ -298,26 +303,25 @@ async def chat_endpoint():
         )
 
 
-@app.route("/history", methods=["GET"])
+
+@app.route("/history", methods = ["GET"])
 async def history_endpoint():
-    """Get chat history endpoint"""
     session_id = request.args.get("session_id", "default")
     return jsonify({"history": agent.get_history(session_id)})
 
 
-@app.route("/clear", methods=["POST"])
+@app.route("/clear", methods = ["POST"])
 async def clear_endpoint():
-    """Clear chat history endpoint"""
     session_id = request.args.get("session_id", "default")
     agent.clear_history(session_id)
     return jsonify({"status": "success"})
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Run the chatbot API server")
-    parser.add_argument("--port", type=int, default=5000, help="Port for API server")
-    parser.add_argument("--host", default="0.0.0.0", help="Host for API server")
-    parser.add_argument("--debug", action="store_true", help="Run in debug mode")
+    parser = argparse.ArgumentParser(description = "Run the chatbot API server")
+    parser.add_argument("--port", type = int, default = 5000, help = "Port for API server")
+    parser.add_argument("--host", default = "127.0.0.1", help = "Host for API server")
+    parser.add_argument("--debug", action = "store_true", help = "Run in debug mode")
     args = parser.parse_args()
 
     config = Config()

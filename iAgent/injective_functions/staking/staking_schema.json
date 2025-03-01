@@ -1,22 +1,27 @@
 {
-    "functions": [
-      {
-        "name": "stake_tokens",
-        "description": "Stake tokens with a validator",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "validator_address": {
-              "type": "string",
-              "description": "Validator address to stake with"
-            },
-            "amount": {
-              "type": "number",
-              "description": "Amount to stake"
-            }
+  "Tools": [
+    {
+      "type": "function",
+      "name": "stake_tokens",
+      "description": "Stake tokens with a validator",
+      "strict": false,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "validator_address": {
+            "type": "string",
+            "description": "Validator address to stake with"
           },
-          "required": ["validator_address", "amount"]
-        }
+          "amount": {
+            "type": "number",
+            "description": "Amount to stake"
+          }
+        },
+        "required": [
+          "validator_address",
+          "amount"
+        ]
       }
-    ]
-  }
+    }
+  ]
+}
