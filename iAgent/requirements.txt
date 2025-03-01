@@ -9,3 +9,4 @@ pyyaml
 cors
 quart_cors
 playwright
+pandas
