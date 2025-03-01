@@ -6,3 +6,5 @@ colorama
 python-dotenv
 quart
 pyyaml
+cors
+quart_cors

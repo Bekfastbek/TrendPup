@@ -17,9 +17,10 @@ from hypercorn.asyncio import serve
 import aiohttp
 import pandas as pd
 from glob import glob
+from quart_cors import cors
 
 app = Quart(__name__)
-
+app = cors(app, allow_origin = "http://localhost:7000")
 
 class InjectiveChatAgent:
     def __init__(self):
