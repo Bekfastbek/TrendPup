@@ -32,58 +32,181 @@ class TwitterScraper:
         self.context = None
         self.page = None
 
-    def login(self):
+    def save_cookies(self):
+        """Save cookies to a file"""
         try:
-            logger.info("Starting login process...")
-            self.page.goto('https://twitter.com/i/flow/login')
+            cookies = self.context.cookies()
+            with open('twitter_cookies.json', 'w') as f:
+                json.dump(cookies, f)
+            logger.info("Cookies saved successfully")
+            return True
+        except Exception as e:
+            logger.error(f"Error saving cookies: {e}")
+            return False
 
+    def load_cookies(self):
+        """Load cookies from file and add them to the browser context"""
+        try:
+            if not os.path.exists('twitter_cookies.json'):
+                logger.info("No saved cookies found")
+                return False
+
+            with open('twitter_cookies.json', 'r') as f:
+                cookies = json.load(f)
+
+            self.context.add_cookies(cookies)
+            logger.info("Cookies loaded successfully")
+            return True
+        except Exception as e:
+            logger.error(f"Error loading cookies: {e}")
+            return False
+
+    def check_login_status(self):
+        """Check if we're already logged in"""
+        try:
+            self.page.goto('https://twitter.com/home')
             self.page.wait_for_load_state('networkidle')
 
+            # Wait a bit for any redirects
+            time.sleep(3)
+
+            # Check if we're on the home page
+            if "twitter.com/home" in self.page.url or "x.com/home" in self.page.url:
+                logger.info("Already logged in via cookies")
+                return True
+
+            logger.info("Not logged in, need to perform login")
+            return False
+        except Exception as e:
+            logger.error(f"Error checking login status: {e}")
+            return False
+
+    def login(self):
+        """Login method with proper timeouts and error handling"""
+        try:
+            # Try to load cookies first
+            if self.load_cookies():
+                # Check if cookies are still valid with timeout
+                if self.check_login_status():
+                    return True
+
+            logger.info("Starting login process...")
+
+            # Navigate to login page with timeout
+            try:
+                self.page.goto('https://twitter.com/i/flow/login', timeout = 30000)  # 30 seconds timeout
+                self.page.wait_for_load_state('networkidle', timeout = 30000)
+            except Exception as e:
+                logger.error(f"Timeout while loading login page: {e}")
+                return False
+
+            # Add a general page timeout for all operations
+            self.page.set_default_timeout(15000)  # 15 seconds default timeout
+
+            # Check if we're already on home page
             if "twitter.com/home" in self.page.url or "x.com/home" in self.page.url:
                 logger.info("Already logged in!")
                 return True
 
-            logger.info("Entering email...")
-            email_selector = "input[autocomplete='username']"
-            self.page.wait_for_selector(email_selector, state = 'visible', timeout = 5000)
-            self.page.fill(email_selector, self.credentials['email'])
+            # Email input
+            try:
+                logger.info("Entering email...")
+                email_selector = "input[autocomplete='username']"
+                self.page.wait_for_selector(email_selector, state = 'visible', timeout = 15000)
+                email_input = self.page.locator(email_selector)
+                email_input.fill(self.credentials['email'])
 
-            next_button = self.page.get_by_role("button", name = "Next")
-            next_button.click()
+                next_button = self.page.get_by_role("button", name = "Next")
+                next_button.click(timeout = 5000)
+            except Exception as e:
+                logger.error(f"Timeout while entering email: {e}")
+                return False
 
-            username_verify_selector = "input[data-testid='ocfEnterTextTextInput']"
-            if self.page.wait_for_selector(username_verify_selector, timeout = 5000, state = 'visible'):
-                logger.info("Username verification required...")
-                self.page.fill(username_verify_selector, self.credentials['username'])
-                self.page.get_by_role("button", name = "Next").click()
+            # Username verification (if required)
+            try:
+                username_verify_selector = "input[data-testid='ocfEnterTextTextInput']"
+                if self.page.wait_for_selector(username_verify_selector, timeout = 5000, state = 'visible'):
+                    logger.info("Username verification required...")
+                    username_input = self.page.locator(username_verify_selector)
+                    username_input.fill(self.credentials['username'])
 
-            logger.info("Entering password...")
-            password_selector = "input[name='password']"
-            self.page.wait_for_selector(password_selector, state = 'visible', timeout = 5000)
-            self.page.fill(password_selector, self.credentials['password'])
+                    next_verify_button = self.page.get_by_role("button", name = "Next")
+                    next_verify_button.click(timeout = 5000)
+            except Exception as e:
+                # Don't return False here as this step might not be required
+                logger.info(f"No username verification needed or timeout: {e}")
 
-            login_button = self.page.get_by_role("button", name = "Log in")
-            login_button.click()
+            # Password input
+            try:
+                logger.info("Entering password...")
+                password_selector = "input[name='password']"
+                self.page.wait_for_selector(password_selector, state = 'visible', timeout = 15000)
+                password_input = self.page.locator(password_selector)
+                password_input.fill(self.credentials['password'])
 
-            self.page.wait_for_load_state('networkidle')
+                login_button = self.page.get_by_role("button", name = "Log in")
+                login_button.click(timeout = 5000)
+            except Exception as e:
+                logger.error(f"Timeout while entering password: {e}")
+                return False
 
-            time.sleep(3)
+            # Wait for navigation and check for success
+            try:
+                # Wait for network activity to settle
+                self.page.wait_for_load_state('networkidle', timeout = 15000)
 
-            max_attempts = 5
-            for attempt in range(max_attempts):
+                # Additional delay for potential redirects
+                time.sleep(3)
+
+                # Check for successful login with multiple attempts
+                max_attempts = 5
+                for attempt in range(max_attempts):
+                    current_url = self.page.url
+                    if "twitter.com/home" in current_url or "x.com/home" in current_url:
+                        logger.info("Successfully logged in!")
+                        self.save_cookies()  # Save cookies after successful login
+                        return True
+
+                    if attempt < max_attempts - 1:  # Don't log on last attempt
+                        logger.info(f"Waiting for home page... Attempt {attempt + 1}/{max_attempts}")
+                        time.sleep(2)
+
+                # If we get here, login probably failed
+                logger.error(f"Login might have failed. Current URL: {current_url}")
+
+                # Check for common error conditions
+                error_selectors = [
+                    "div[data-testid='error-detail']",
+                    "div[data-testid='login_error']",
+                    "div[data-testid='login_challenge']"
+                ]
+
+                for selector in error_selectors:
+                    try:
+                        error_element = self.page.wait_for_selector(selector, timeout = 3000)
+                        if error_element:
+                            error_text = error_element.inner_text()
+                            logger.error(f"Login error detected: {error_text}")
+                    except:
+                        continue
+
+                return False
+
+            except Exception as e:
+                logger.error(f"Timeout while waiting for login completion: {e}")
+                # Final check in case we're actually logged in despite the timeout
                 if "twitter.com/home" in self.page.url or "x.com/home" in self.page.url:
-                    logger.info("Successfully logged in!")
+                    logger.info("Successfully logged in despite timeout!")
+                    self.save_cookies()
                     return True
-                logger.info(f"Waiting for home page... Attempt {attempt + 1}/{max_attempts}")
-                time.sleep(2)
-
-            logger.error(f"Login might have failed. Current URL: {self.page.url}")
-            return False
+                return False
 
         except Exception as e:
-            logger.error(f"Login failed: {e}")
+            logger.error(f"Login failed with exception: {e}")
+            # Final URL check even if we caught an exception
             if "twitter.com/home" in self.page.url or "x.com/home" in self.page.url:
                 logger.info("Successfully logged in despite errors!")
+                self.save_cookies()
                 return True
             return False
 
@@ -204,18 +327,39 @@ class TwitterScraper:
 
     def setup_browser(self):
         """Extract browser setup logic from run method"""
+        import platform
+
         self.playwright = sync_playwright().start()
+
+        # Base launch arguments
+        launch_args = [
+            '--no-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-gpu',
+            '--disable-blink-features=AutomationControlled',
+            '--start-maximized',
+            '--disable-notifications'
+        ]
+
+        # Add Linux-specific configurations
+        if platform.system() == 'Linux':
+            # Check if running in WSL
+            is_wsl = 'microsoft' in platform.uname().release.lower()
+
+            if not is_wsl:
+                # For native Linux
+                launch_args.extend([
+                    '--disable-setuid-sandbox',
+                    '--single-process',
+                    f'--display={os.environ.get("DISPLAY", ":0")}',  # Try :0 first
+                ])
+        else:
+            # For Windows/Mac
+            launch_args.append(f'--display={os.environ.get("DISPLAY", ":99")}')
+
         self.browser = self.playwright.chromium.launch(
             headless = False,
-            args = [
-                '--no-sandbox',
-                '--disable-dev-shm-usage',
-                '--disable-gpu',
-                f'--display={os.environ.get("DISPLAY", ":99")}',
-                '--disable-blink-features=AutomationControlled',
-                '--start-maximized',
-                '--disable-notifications'
-            ]
+            args = launch_args
         )
 
         self.context = self.browser.new_context(
@@ -237,6 +381,7 @@ class TwitterScraper:
         """)
 
         self.page = self.context.new_page()
+
 
     def run(self, query = "", max_tweets = 100):
         """Run method with retry logic and rate limit handling"""
