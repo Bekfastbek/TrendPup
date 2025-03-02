@@ -25,7 +25,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (response) {
         res.status(200).json({ response });
       } else {
-        res.status(500).json({ error: 'No response from agent' });
+        res.status(500).json({ error: 'No res`ponse from agent' });
       }
     } catch (error) {
       res.status(500).json({ error: 'Error processing the message' });

@@ -1,7 +1,7 @@
 {
   "name": "InjectiveAssistant",
   "plugins": ["injective"],
-  "clients": [],
+  "clients": ["discord"],
   "modelProvider": "google",
   "settings": {
     "secrets": {
