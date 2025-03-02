@@ -5,10 +5,10 @@
   "modelProvider": "google",
   "settings": {
     "secrets": {
-      "INJECTIVE_NETWORK": "Testnet",
-      "INJECTIVE_PRIVATE_KEY": "eb1b12901aedcd849fa334208ba916150bad663076340b5608fbdf4432037074",
-      "INJECTIVE_PUBLIC_KEY": "inj14tf02w7tpw8z7fcz6ju8xvhmaategcdna2mrqc",
-      "EVM_PUBLIC_KEY": "0x2ec8175015Bef5ad1C0BE1587C4A377bC083A2d8"
+      "INJECTIVE_NETWORK": "${INJECTIVE_NETWORK}",
+      "INJECTIVE_PRIVATE_KEY": "${INJECTIVE_PRIVATE_KEY}",
+      "INJECTIVE_PUBLIC_KEY": "${INJECTIVE_PUBLIC_KEY}",
+      "EVM_PUBLIC_KEY": "${EVM_PUBLIC_KEY}"
     },
     "voice": {
       "model": "en_US-hfc_female-medium"
