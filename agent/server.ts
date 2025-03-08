@@ -11,3 +11,4 @@ export const startServer = () => {
     elizaLogger.log(`API Server running on port ${PORT}`);
   });
 };
+// test
