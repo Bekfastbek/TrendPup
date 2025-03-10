@@ -1,7 +1,7 @@
 import express from "express";
 import { startAgent } from "./src/index.ts";
 import { DirectClient } from "@elizaos/client-direct";
-import { loadCharacters } from "./config/index.ts";
+import { loadCharacters } from "./characters/balance.character.json";
 
 const app = express();
 const port = process.env.PORT || 4000;
