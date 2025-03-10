@@ -1,5 +1,5 @@
 import express from "express";
-import { startAgent } from "./path/to/your/agent-file"; // Adjust the path as needed
+import { startAgent } from "./src/index.js";
 import { DirectClient } from "@elizaos/client-direct";
 import { loadCharacters } from "./config/index.ts";
 
