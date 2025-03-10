@@ -1,3 +1,4 @@
+import express from "express";
 import { DirectClient } from "@elizaos/client-direct";
 import {
   AgentRuntime,
@@ -7,12 +8,9 @@ import {
   type Character,
   type Plugin,
 } from "@elizaos/core";
-import { DiscordClient } from "@elizaos/client-discord";
 import { bootstrapPlugin } from "@elizaos/plugin-bootstrap";
 import { createNodePlugin } from "@elizaos/plugin-node";
 import { solanaPlugin } from "@elizaos/plugin-solana";
-
-// Import the injective plugin properly
 import { injectivePlugin } from "@elizaos/plugin-injective";
 
 import fs from "fs";
@@ -34,12 +32,11 @@ import { initializeDatabase } from "./database/index.ts";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-export const wait = (minTime: number = 1000, maxTime: number = 3000) => {
-  const waitTime =
-    Math.floor(Math.random() * (maxTime - minTime + 1)) + minTime;
-  return new Promise((resolve) => setTimeout(resolve, waitTime));
-};
+const app = express();
+const PORT = settings.SERVER_PORT || 4000;
+app.use(express.json());
 
+const directClient = new DirectClient();
 let nodePlugin: any | undefined;
 
 export function createAgent(
@@ -48,37 +45,22 @@ export function createAgent(
   cache: any,
   token: string
 ) {
-  elizaLogger.success(
-    elizaLogger.successesTitle,
-    "Creating runtime for character",
-    character.name,
-  );
+  elizaLogger.success("Creating runtime for character", character.name);
 
   nodePlugin ??= createNodePlugin();
+  const plugins: Plugin[] = [bootstrapPlugin, nodePlugin];
 
-  // Create the plugins array with proper typing
-  const plugins: Plugin[] = [
-    bootstrapPlugin,
-    nodePlugin,
-  ];
-
-  // Add conditional plugins
   if (character.settings?.secrets?.WALLET_PUBLIC_KEY) {
     plugins.push(solanaPlugin);
   }
-
-  // Instead of trying to directly add the plugin based on the character's plugin list,
-  // we'll just unconditionally add it for InjectiveAssistant
   if (character.name === "InjectiveAssistant") {
     plugins.push(injectivePlugin);
     elizaLogger.debug("Added Injective plugin for InjectiveAssistant");
   }
 
-  // Choose appropriate actions based on character name
   let actions = [];
   if (character.name === "InjectiveAssistant") {
     actions = BalanceActions;
-    elizaLogger.debug("Added Balance Actions for InjectiveAssistant");
   }
 
   return new AgentRuntime({
@@ -87,16 +69,16 @@ export function createAgent(
     modelProvider: character.modelProvider,
     evaluators: [],
     character,
-    plugins: plugins, // Explicitly using our typed array
+    plugins,
     providers: [],
-    actions: actions,
+    actions,
     services: [],
     managers: [],
     cacheManager: cache,
   });
 }
 
-async function startAgent(character: Character, directClient: DirectClient) {
+async function startAgent(character: Character) {
   try {
     character.id ??= stringToUuid(character.name);
     character.username ??= character.name;
@@ -109,97 +91,96 @@ async function startAgent(character: Character, directClient: DirectClient) {
     }
 
     const db = initializeDatabase(dataDir);
-
     await db.init();
-
     const cache = initializeDbCache(character, db);
     const runtime = createAgent(character, db, cache, token);
-
     await runtime.initialize();
-
     runtime.clients = await initializeClients(character, runtime);
 
     directClient.registerAgent(runtime);
 
-    // report to console
     elizaLogger.debug(`Started ${character.name} as ${runtime.agentId}`);
-
     return runtime;
   } catch (error) {
-    elizaLogger.error(
-      `Error starting agent for character ${character.name}:`,
-      error,
-    );
-    console.error(error);
+    elizaLogger.error(`Error starting agent for ${character.name}:`, error);
     throw error;
   }
 }
 
-const checkPortAvailable = (port: number): Promise<boolean> => {
-  return new Promise((resolve) => {
-    const server = net.createServer();
-
-    server.once("error", (err: NodeJS.ErrnoException) => {
-      if (err.code === "EADDRINUSE") {
-        resolve(false);
-      }
-    });
-
-    server.once("listening", () => {
-      server.close();
-      resolve(true);
-    });
-
-    server.listen(port);
-  });
-};
-
 const startAgents = async () => {
-  const directClient = new DirectClient();
-  let serverPort = parseInt(settings.SERVER_PORT || "3000");
   const args = parseArguments();
-
   let charactersArg = args.characters || args.character;
   let characters = [character];
 
-  console.log("charactersArg", charactersArg);
   if (charactersArg) {
     characters = await loadCharacters(charactersArg);
   }
-  console.log("characters", characters);
+
   try {
     for (const character of characters) {
-      await startAgent(character, directClient as DirectClient);
+      await startAgent(character);
     }
   } catch (error) {
     elizaLogger.error("Error starting agents:", error);
   }
-
-  while (!(await checkPortAvailable(serverPort))) {
-    elizaLogger.warn(`Port ${serverPort} is in use, trying ${serverPort + 1}`);
-    serverPort++;
-  }
-
-  // upload some agent functionality into directClient
-  directClient.startAgent = async (character: Character) => {
-    // wrap it so we don't have to inject directClient later
-    return startAgent(character, directClient);
-  };
-
-  directClient.start(serverPort);
-
-  if (serverPort !== parseInt(settings.SERVER_PORT || "3000")) {
-    elizaLogger.log(`Server started on alternate port ${serverPort}`);
-  }
-
-  const isDaemonProcess = process.env.DAEMON_PROCESS === "true";
-  if(!isDaemonProcess) {
-    elizaLogger.log("Chat started. Type 'exit' to quit.");
-    const chat = startChat(characters);
-    chat();
-  }
 };
 
+// Express API Routes
+
+// Health Check
+app.get("/health", (req, res) => {
+  res.json({ success: true, status: "Server is running" });
+});
+
+// Get all active agents
+app.get("/agents", (req, res) => {
+  const agents = directClient.getAgents() || [];
+  res.json({
+    success: true,
+    data: agents.map((agent) => ({
+      id: agent.agentId,
+      name: agent.character.name,
+      status: "active",
+    })),
+  });
+});
+
+// Start a new agent
+app.post("/agents", async (req, res) => {
+  try {
+    const { character } = req.body;
+    if (!character?.name) {
+      return res.status(400).json({ success: false, error: "Invalid character" });
+    }
+
+    const agent = await startAgent(character);
+    res.status(201).json({
+      success: true,
+      data: { id: agent.agentId, name: agent.character.name },
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: "Failed to create agent" });
+  }
+});
+
+// Get a specific agent by ID
+app.get("/agents/:id", (req, res) => {
+  const agent = directClient.getAgent(req.params.id);
+  if (!agent) {
+    return res.status(404).json({ success: false, error: "Agent not found" });
+  }
+  res.json({
+    success: true,
+    data: { id: agent.agentId, name: agent.character.name, status: "active" },
+  });
+});
+
+// Start Express Server
+app.listen(PORT, () => {
+  elizaLogger.log(`API Server running on port ${PORT}`);
+});
+
+// Start agents
 startAgents().catch((error) => {
   elizaLogger.error("Unhandled error in startAgents:", error);
   process.exit(1);
