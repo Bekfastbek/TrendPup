@@ -148,8 +148,7 @@ app.get("/agents", (req: Request, res: Response) => {
   });
 });
 
-// Start a new agent
-app.post("/agents", async (req: Request, res: Response) => {
+app.post("/agents", async (req: Request, res: Response): Promise<Response> => {
   try {
     const { character } = req.body;
     if (!character?.name) {
@@ -157,27 +156,27 @@ app.post("/agents", async (req: Request, res: Response) => {
     }
 
     const agent = await startAgent(character);
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
       data: { id: agent.agentId, name: agent.character.name },
     });
   } catch (error) {
     elizaLogger.error("Failed to create agent:", error);
-    res.status(500).json({ success: false, error: "Failed to create agent" });
+    return res.status(500).json({ success: false, error: "Failed to create agent" });
   }
 });
 
-// Get a specific agent by ID
-app.get("/agents/:id", (req: Request, res: Response) => {
+app.get("/agents/:id", (req: Request, res: Response): Response => {
   const agent = activeAgents[req.params.id];
   if (!agent) {
     return res.status(404).json({ success: false, error: "Agent not found" });
   }
-  res.json({
+  return res.json({
     success: true,
     data: { id: agent.agentId, name: agent.character.name, status: "active" },
   });
 });
+
 
 // Start Express Server
 app.listen(PORT, () => {
