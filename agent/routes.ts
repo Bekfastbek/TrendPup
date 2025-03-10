@@ -1,6 +1,6 @@
 import express, { Request, Response, Router } from 'express';
 import cors from 'cors';
-import { Character } from '@elizaos/core';
+import { type Character } from '@elizaos/core';
 
 const router = Router();
 interface ApiResponse<T = any> {
