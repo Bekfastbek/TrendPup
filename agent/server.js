@@ -1,62 +1,32 @@
-import express from "express";
-import { startAgent } from "./src/index.ts";
+import { WebSocketServer } from "ws";
+import { startAgent } from "./src/index.js";
 import { DirectClient } from "@elizaos/client-direct";
-import { loadCharacters } from "./characters/balance.character.json";
 
-const app = express();
-const port = process.env.PORT || 4000;
 const directClient = new DirectClient();
+const wss = new WebSocketServer({ port: 8080 });
 
-app.use(express.json());
+wss.on("connection", (ws) => {
+  console.log("Client connected");
 
-// Start a specific agent
-app.post("/start-agent", async (req, res) => {
-  try {
-    const { characterName } = req.body;
-    if (!characterName) {
-      return res.status(400).json({ error: "Character name is required" });
+  ws.on("message", async (message) => {
+    try {
+      const data = JSON.parse(message);
+
+      if (data.type === "startAgent" && data.character) {
+        const agent = await startAgent(data.character, directClient);
+        ws.send(JSON.stringify({ status: "success", agentId: agent.agentId }));
+      } else {
+        ws.send(JSON.stringify({ status: "error", message: "Invalid request" }));
+      }
+    } catch (error) {
+      console.error("Error processing message:", error);
+      ws.send(JSON.stringify({ status: "error", message: error.message }));
     }
+  });
 
-    const characters = await loadCharacters(characterName);
-    if (characters.length === 0) {
-      return res.status(404).json({ error: "Character not found" });
-    }
-
-    const character = characters[0];
-    const agent = await startAgent(character, directClient);
-    res.json({ message: "Agent started successfully", agentId: agent.agentId });
-  } catch (error) {
-    res.status(500).json({ error: "Failed to start agent", details: error.message });
-  }
+  ws.on("close", () => {
+    console.log("Client disconnected");
+  });
 });
 
-// Get status of running agents
-app.get("/agents", (req, res) => {
-  const agents = directClient.getAgents();
-  res.json(agents.map(agent => ({ agentId: agent.agentId, name: agent.character.name })));
-});
-
-// Stop an agent
-app.post("/stop-agent", async (req, res) => {
-  try {
-    const { agentId } = req.body;
-    if (!agentId) {
-      return res.status(400).json({ error: "Agent ID is required" });
-    }
-
-    const agent = directClient.getAgentById(agentId);
-    if (!agent) {
-      return res.status(404).json({ error: "Agent not found" });
-    }
-
-    await agent.shutdown();
-    res.json({ message: "Agent stopped successfully" });
-  } catch (error) {
-    res.status(500).json({ error: "Failed to stop agent", details: error.message });
-  }
-});
-
-// Start the API server
-app.listen(port, () => {
-  console.log(`Agent API server is running on port ${port}`);
-});
+console.log("WebSocket server running on ws://localhost:8080");
