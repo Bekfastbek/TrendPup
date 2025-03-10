@@ -149,7 +149,7 @@ app.get("/agents", (req: Request, res: Response) => {
 });
 
 // Start a new agent
-app.post("/agents", async (req: Request, res: Response) => {
+app.post("/agents", async (req, res) => {
   try {
     const { character } = req.body;
     if (!character?.name) {
@@ -168,7 +168,7 @@ app.post("/agents", async (req: Request, res: Response) => {
 });
 
 // Get a specific agent by ID
-app.get("/agents/:id", (req: Request, res: Response) => {
+app.get("/agents/:id", (req, res) => {
   const agent = activeAgents[req.params.id];
   if (!agent) {
     return res.status(404).json({ success: false, error: "Agent not found" });
