@@ -1,4 +1,4 @@
-import express from "express";
+import express, { Request, Response } from "express";
 import { DirectClient } from "@elizaos/client-direct";
 import {
   AgentRuntime,
@@ -14,37 +14,38 @@ import { solanaPlugin } from "@elizaos/plugin-solana";
 import { injectivePlugin } from "@elizaos/plugin-injective";
 
 import fs from "fs";
-import net from "net";
 import path from "path";
 import { fileURLToPath } from "url";
-import { BalanceActions } from "./actions/balance-actions.ts";
-import { initializeDbCache } from "./cache/index.ts";
-import { character } from "./character.ts";
-import { startChat } from "./chat/index.ts";
-import { initializeClients } from "./clients/index.ts";
+import { BalanceActions } from "./actions/balance-actions";
+import { initializeDbCache } from "./cache";
+import { character } from "./character";
+import { initializeClients } from "./clients";
 import {
   getTokenForProvider,
   loadCharacters,
   parseArguments,
-} from "./config/index.ts";
-import { initializeDatabase } from "./database/index.ts";
+} from "./config";
+import { initializeDatabase } from "./database";
 
+// Resolve __dirname and __filename for ES modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Initialize Express app
 const app = express();
 const PORT = settings.SERVER_PORT || 4000;
 app.use(express.json());
 
 const directClient = new DirectClient();
-let nodePlugin: any | undefined;
+let nodePlugin: Plugin | undefined;
+const activeAgents: Record<string, AgentRuntime> = {}; // Store running agents
 
 export function createAgent(
   character: Character,
   db: any,
   cache: any,
   token: string
-) {
+): AgentRuntime {
   elizaLogger.success("Creating runtime for character", character.name);
 
   nodePlugin ??= createNodePlugin();
@@ -98,6 +99,7 @@ async function startAgent(character: Character) {
     runtime.clients = await initializeClients(character, runtime);
 
     directClient.registerAgent(runtime);
+    activeAgents[runtime.agentId] = runtime; // Store agent manually
 
     elizaLogger.debug(`Started ${character.name} as ${runtime.agentId}`);
     return runtime;
@@ -128,25 +130,26 @@ const startAgents = async () => {
 // Express API Routes
 
 // Health Check
-app.get("/health", (req, res) => {
+app.get("/health", (req: Request, res: Response) => {
   res.json({ success: true, status: "Server is running" });
 });
 
 // Get all active agents
-app.get("/agents", (req, res) => {
-  const agents = directClient.getAgents() || [];
+app.get("/agents", (req: Request, res: Response) => {
+  const agents = Object.values(activeAgents).map((agent) => ({
+    id: agent.agentId,
+    name: agent.character.name,
+    status: "active",
+  }));
+
   res.json({
     success: true,
-    data: agents.map((agent) => ({
-      id: agent.agentId,
-      name: agent.character.name,
-      status: "active",
-    })),
+    data: agents,
   });
 });
 
 // Start a new agent
-app.post("/agents", async (req, res) => {
+app.post("/agents", async (req: Request, res: Response) => {
   try {
     const { character } = req.body;
     if (!character?.name) {
@@ -159,13 +162,14 @@ app.post("/agents", async (req, res) => {
       data: { id: agent.agentId, name: agent.character.name },
     });
   } catch (error) {
+    elizaLogger.error("Failed to create agent:", error);
     res.status(500).json({ success: false, error: "Failed to create agent" });
   }
 });
 
 // Get a specific agent by ID
-app.get("/agents/:id", (req, res) => {
-  const agent = directClient.getAgent(req.params.id);
+app.get("/agents/:id", (req: Request, res: Response) => {
+  const agent = activeAgents[req.params.id];
   if (!agent) {
     return res.status(404).json({ success: false, error: "Agent not found" });
   }
