@@ -1,5 +1,5 @@
 import { WebSocketServer } from "ws";
-import { startAgent } from "./src/index.js";
+import { startAgent } from "./src/index.ts";
 import { DirectClient } from "@elizaos/client-direct";
 
 const directClient = new DirectClient();
