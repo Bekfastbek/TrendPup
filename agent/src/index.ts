@@ -1,4 +1,4 @@
-import express, { Request, Response } from "express";
+import express, { Application, Request, Response } from "express";
 import { DirectClient } from "@elizaos/client-direct";
 import {
   AgentRuntime,
@@ -32,7 +32,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Initialize Express app
-const app = express();
+const app: Application = express();
 const PORT = settings.SERVER_PORT || 4000;
 app.use(express.json());
 
@@ -149,7 +149,7 @@ app.get("/agents", (req: Request, res: Response) => {
 });
 
 // Start a new agent
-app.post("/agents", async (req, res) => {
+app.post("/agents", async (req: Request, res: Response) => {
   try {
     const { character } = req.body;
     if (!character?.name) {
@@ -168,7 +168,7 @@ app.post("/agents", async (req, res) => {
 });
 
 // Get a specific agent by ID
-app.get("/agents/:id", (req, res) => {
+app.get("/agents/:id", (req: Request, res: Response) => {
   const agent = activeAgents[req.params.id];
   if (!agent) {
     return res.status(404).json({ success: false, error: "Agent not found" });
