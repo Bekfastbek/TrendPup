@@ -49,7 +49,7 @@ if command_exists tmux; then
     # Start backend in first window
     # Explicitly set SERVER_PORT to 3001 to avoid conflicts
     # Make sure WebSocket server can start on 8080
-    tmux send-keys -t trendpup:0 'cd agent1/eliza-starter && pnpm install && HOST=0.0.0.0 SERVER_PORT=3001 pnpm start --character="./characters/balance.character.json"' C-m
+    tmux send-keys -t trendpup:0 'cd agent && pnpm install && HOST=0.0.0.0 SERVER_PORT=3001 pnpm start --character="./characters/balance.character.json"' C-m
     
     # Wait a bit for the backend to start
     sleep 5
@@ -67,7 +67,7 @@ else
     echo "Starting services..."
     
     # Start backend with explicit port settings
-    (cd agent1/eliza-starter && pnpm install && HOST=0.0.0.0 SERVER_PORT=3001 pnpm start --character="./characters/balance.character.json") &
+    (cd agent && pnpm install && HOST=0.0.0.0 SERVER_PORT=3001 pnpm start --character="./characters/balance.character.json") &
     
     # Wait a bit for backend to start
     sleep 5
