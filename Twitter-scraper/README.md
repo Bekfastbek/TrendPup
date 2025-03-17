@@ -32,6 +32,17 @@ This scraper now uses a cookie-based authentication method only. The automated l
    ./run_scraper.sh
    ```
 
+## Setting Up Gemini API
+
+The analyzer uses Google's Gemini API to analyze tweets. To set it up:
+
+1. Get a Gemini API key from https://aistudio.google.com/app/apikey
+2. Copy the `.env.template` file to `.env`:
+   ```
+   cp .env.template .env
+   ```
+3. Edit the `.env` file and replace `your_api_key_here` with your actual Gemini API key
+
 ## Notes
 
 - Cookies typically expire after a certain period, so you may need to refresh them periodically

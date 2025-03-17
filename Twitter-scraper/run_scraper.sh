@@ -37,4 +37,7 @@ sleep 2
 echo "Starting scraper..."
 python3 scraper.py
 
+echo "Starting Gemini analyzer..."
+python3 gemini_analyzer.py
+
 pkill Xvfb

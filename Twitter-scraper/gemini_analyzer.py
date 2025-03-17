@@ -8,6 +8,8 @@ from collections import defaultdict
 import time
 import backoff
 import os
+from dotenv import load_dotenv
+import fcntl
 
 # Configure logging
 logging.basicConfig(
@@ -20,8 +22,13 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Load environment variables
+load_dotenv()
+
 # Configure Gemini
-GEMINI_API_KEY = ""
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+if not GEMINI_API_KEY:
+    logger.warning("GEMINI_API_KEY environment variable not set. Please set it in .env file.")
 genai.configure(api_key=GEMINI_API_KEY)
 model = genai.GenerativeModel('gemini-2.0-flash')
 
@@ -141,12 +148,28 @@ def analyze_coin_with_gemini(coin_data):
 
 def process_tweets(json_file):
     """Process tweet data and extract coin information."""
-    try:
-        with open(json_file, 'r', encoding='utf-8') as f:
-            tweets = json.load(f)
-    except Exception as e:
-        logger.error(f"Error reading JSON file: {e}")
-        return None
+    max_retries = 3
+    retry_delay = 5  # seconds
+    
+    for attempt in range(max_retries):
+        try:
+            with open(json_file, 'r', encoding='utf-8') as f:
+                # Try to acquire a shared lock
+                fcntl.flock(f.fileno(), fcntl.LOCK_SH | fcntl.LOCK_NB)
+                try:
+                    tweets = json.load(f)
+                    fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+                    break
+                finally:
+                    fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+        except (IOError, json.JSONDecodeError) as e:
+            if attempt < max_retries - 1:
+                logger.warning(f"Attempt {attempt + 1} failed to read {json_file}: {e}")
+                logger.info(f"Retrying in {retry_delay} seconds...")
+                time.sleep(retry_delay)
+            else:
+                logger.error(f"Failed to read {json_file} after {max_retries} attempts: {e}")
+                return None
 
     # Load cache
     cache_data = load_cache()
