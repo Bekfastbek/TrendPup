@@ -1,10 +1,7 @@
 *.ts
 dist
-!actions/balance-actions.ts
 !index.ts
 !character.ts
-!agent/src/actions/**
-!agent/src/plugins/**
 .env
 node_modules
 dist/

@@ -1,0 +1,46 @@
+# Twitter scraper specific files
+twitter_cookies.json
+twitter_data.json
+analyzed_memecoins.json
+scraper_config.json
+
+# Python specific
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Environment
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Logs and cache
+*.log
+.cache/
+
+# Editor directories and files
+.idea/
+.vscode/
+*.swp
+*.swo 

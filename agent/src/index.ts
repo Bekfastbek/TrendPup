@@ -5,21 +5,14 @@ import {
   settings,
   stringToUuid,
   type Character,
-  type Plugin,
 } from "@elizaos/core";
-import { DiscordClient } from "@elizaos/client-discord";
 import { bootstrapPlugin } from "@elizaos/plugin-bootstrap";
 import { createNodePlugin } from "@elizaos/plugin-node";
 import { solanaPlugin } from "@elizaos/plugin-solana";
-
-// Import the injective plugin properly
-import { injectivePlugin } from "@elizaos/plugin-injective";
-
 import fs from "fs";
 import net from "net";
 import path from "path";
 import { fileURLToPath } from "url";
-import { BalanceActions } from "./actions/balance-actions.ts";
 import { initializeDbCache } from "./cache/index.ts";
 import { character } from "./character.ts";
 import { startChat } from "./chat/index.ts";
@@ -30,6 +23,7 @@ import {
   parseArguments,
 } from "./config/index.ts";
 import { initializeDatabase } from "./database/index.ts";
+import { WebSocketHandler } from "./websocket/index.ts";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -56,40 +50,19 @@ export function createAgent(
 
   nodePlugin ??= createNodePlugin();
 
-  // Create the plugins array with proper typing
-  const plugins: Plugin[] = [
-    bootstrapPlugin,
-    nodePlugin,
-  ];
-
-  // Add conditional plugins
-  if (character.settings?.secrets?.WALLET_PUBLIC_KEY) {
-    plugins.push(solanaPlugin);
-  }
-
-  // Instead of trying to directly add the plugin based on the character's plugin list,
-  // we'll just unconditionally add it for InjectiveAssistant
-  if (character.name === "InjectiveAssistant") {
-    plugins.push(injectivePlugin);
-    elizaLogger.debug("Added Injective plugin for InjectiveAssistant");
-  }
-
-  // Choose appropriate actions based on character name
-  let actions = [];
-  if (character.name === "InjectiveAssistant") {
-    actions = BalanceActions;
-    elizaLogger.debug("Added Balance Actions for InjectiveAssistant");
-  }
-
   return new AgentRuntime({
     databaseAdapter: db,
     token,
     modelProvider: character.modelProvider,
     evaluators: [],
     character,
-    plugins: plugins, // Explicitly using our typed array
+    plugins: [
+      bootstrapPlugin,
+      nodePlugin,
+      character.settings?.secrets?.WALLET_PUBLIC_KEY ? solanaPlugin : null,
+    ].filter(Boolean),
     providers: [],
-    actions: actions,
+    actions: [],
     services: [],
     managers: [],
     cacheManager: cache,
@@ -192,6 +165,15 @@ const startAgents = async () => {
     elizaLogger.log(`Server started on alternate port ${serverPort}`);
   }
 
+  // Initialize WebSocket server on port 8080
+  const wsPort = 8080;
+  if (await checkPortAvailable(wsPort)) {
+    const wsHandler = new WebSocketHandler(wsPort, directClient, characters);
+    elizaLogger.success(`WebSocket server started on port ${wsPort}`);
+  } else {
+    elizaLogger.error(`Port ${wsPort} is in use, WebSocket server not started`);
+  }
+
   const isDaemonProcess = process.env.DAEMON_PROCESS === "true";
   if(!isDaemonProcess) {
     elizaLogger.log("Chat started. Type 'exit' to quit.");
@@ -204,5 +186,3 @@ startAgents().catch((error) => {
   elizaLogger.error("Unhandled error in startAgents:", error);
   process.exit(1);
 });
-
-export { startAgent };

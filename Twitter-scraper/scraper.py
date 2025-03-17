@@ -5,6 +5,8 @@ import logging
 from datetime import datetime
 import json
 import os
+import csv
+import sys
 
 with open('scraper_config.json', 'r') as f:
     config = json.load(f)
@@ -19,6 +21,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# File to store cookies
+COOKIES_FILE = "twitter_cookies.json"
 
 class TwitterScraper:
     def __init__(self):
@@ -35,7 +39,7 @@ class TwitterScraper:
     def save_cookies(self):
         try:
             cookies = self.context.cookies()
-            with open('twitter_cookies.json', 'w') as f:
+            with open(COOKIES_FILE, 'w') as f:
                 json.dump(cookies, f)
             logger.info("Cookies saved successfully")
             return True
@@ -45,12 +49,43 @@ class TwitterScraper:
 
     def load_cookies(self):
         try:
-            if not os.path.exists('twitter_cookies.json'):
+            if not os.path.exists(COOKIES_FILE):
                 logger.info("No saved cookies found")
                 return False
 
-            with open('twitter_cookies.json', 'r') as f:
+            with open(COOKIES_FILE, 'r') as f:
                 cookies = json.load(f)
+            
+            # Convert sameSite values to Playwright format
+            for cookie in cookies:
+                # Convert "no_restriction" to "None"
+                if "sameSite" in cookie:
+                    if cookie["sameSite"] == "no_restriction":
+                        cookie["sameSite"] = "None"
+                    elif cookie["sameSite"] == "lax":
+                        cookie["sameSite"] = "Lax"
+                    elif cookie["sameSite"] == "strict":
+                        cookie["sameSite"] = "Strict"
+                    # If sameSite is null, set it to None
+                    elif cookie["sameSite"] is None:
+                        cookie["sameSite"] = "None"
+                
+                # Ensure all required fields are present
+                if "sameSite" not in cookie or cookie["sameSite"] == "":
+                    cookie["sameSite"] = "None"
+                
+                # Remove fields not used by Playwright to avoid errors
+                if "hostOnly" in cookie:
+                    del cookie["hostOnly"]
+                if "session" in cookie:
+                    del cookie["session"]
+                if "storeId" in cookie:
+                    del cookie["storeId"]
+                
+                # Convert expirationDate to expires
+                if "expirationDate" in cookie:
+                    cookie["expires"] = cookie["expirationDate"]
+                    del cookie["expirationDate"]
 
             self.context.add_cookies(cookies)
             logger.info("Cookies loaded successfully")
@@ -81,8 +116,9 @@ class TwitterScraper:
                     logger.warning(f"On home URL but couldn't verify elements: {e}")
 
             try:
-                logger.info("Attempting to load home page...")
-                self.page.goto('https://twitter.com/home',
+                # Try x.com first since that's the domain of the cookies
+                logger.info("Attempting to load x.com home page...")
+                self.page.goto('https://x.com/home',
                                timeout = 15000,
                                wait_until = 'domcontentloaded')
 
@@ -134,83 +170,16 @@ class TwitterScraper:
     def login(self):
         try:
             if self.load_cookies() and self.check_login_status():
+                logger.info("Successfully logged in with cookies")
                 return True
-
-            logger.info("Starting login process...")
-
-            try:
-                self.page.goto('https://twitter.com/i/flow/login', wait_until = 'domcontentloaded')
-                self.page.wait_for_selector('input[autocomplete="username"], div[data-testid="primaryColumn"]')
-            except Exception as e:
-                logger.error(f"Failed to load login page: {e}")
-                return False
-
-            if 'home' in self.page.url.lower():
-                logger.info("Redirected to home - already logged in")
-                return True
-
-            try:
-                logger.info("Entering email...")
-                email_input = self.page.wait_for_selector('input[autocomplete="username"]', state = 'visible')
-                email_input.fill(self.credentials['email'])
-                email_input.press('Tab')
-
-                next_button = self.page.get_by_role("button", name = "Next")
-                next_button.click()
-
-                self.page.wait_for_selector('input[data-testid="ocfEnterTextTextInput"], input[name="password"]')
-            except Exception as e:
-                logger.error(f"Failed at email step: {e}")
-                return False
-
-            try:
-                username_input = self.page.query_selector('input[data-testid="ocfEnterTextTextInput"]')
-                if username_input:
-                    logger.info("Username verification required...")
-                    username_input.fill(self.credentials['username'])
-                    username_input.press('Tab')
-
-                    verify_button = self.page.get_by_role("button", name = "Next")
-                    verify_button.click()
-                    self.page.wait_for_selector('input[name="password"]')
-            except Exception as e:
-                logger.info(f"No username verification or error: {e}")
-
-            try:
-                logger.info("Entering password...")
-                password_input = self.page.wait_for_selector('input[name="password"]', state = 'visible')
-                password_input.fill(self.credentials['password'])
-                password_input.press('Tab')
-
-                login_button = self.page.get_by_role("button", name = "Log in")
-                login_button.click()
-
-                self.page.wait_for_selector(
-                    'div[data-testid="primaryColumn"], div[data-testid="error-detail"]'
-                )
-            except Exception as e:
-                logger.error(f"Failed at password step: {e}")
-                return False
-
-            try:
-
-                error = self.page.query_selector('div[data-testid="error-detail"]')
-                if error:
-                    error_text = error.inner_text()
-                    logger.error(f"Login error: {error_text}")
-                    return False
-
-                if any(url in self.page.url.lower() for url in ['twitter.com/home', 'x.com/home']):
-                    logger.info("Successfully logged in!")
-                    self.save_cookies()
-                    return True
-                else:
-                    logger.error(f"Login failed - unexpected URL: {self.page.url}")
-                    return False
-
-            except Exception as e:
-                logger.error(f"Final verification failed: {e}")
-                return False
+            
+            logger.error("Login failed: No valid cookies found")
+            logger.info("Please manually create a valid cookies.json file")
+            logger.info("1. Login to Twitter in a browser")
+            logger.info("2. Use browser extensions like 'Cookie-Editor' to export cookies as JSON")
+            logger.info("3. Save the exported cookies to cookies.json in this directory")
+            
+            return False
 
         except Exception as e:
             logger.error(f"Login process failed: {e}")
@@ -239,7 +208,7 @@ class TwitterScraper:
 
             link_element = tweet.query_selector('a[href*="/status/"]')
             if link_element:
-                tweet_data['url'] = f"https://twitter.com{link_element.get_attribute('href')}"
+                tweet_data['url'] = f"https://x.com{link_element.get_attribute('href')}"
 
             return tweet_data
 
@@ -290,9 +259,9 @@ class TwitterScraper:
         try:
             if query:
                 encoded_query = query.replace(' ', '%20')
-                self.page.goto(f'https://twitter.com/search?q={encoded_query}&f=live')
+                self.page.goto(f'https://x.com/search?q={encoded_query}&f=live')
             else:
-                self.page.goto('https://twitter.com/home')
+                self.page.goto('https://x.com/home')
 
             logger.info("Waiting for tweets to load...")
             time.sleep(5)
@@ -436,14 +405,14 @@ def create_search_queries(scraper):
 
 
 def main():
-    csv_filename = 'twitter_data.csv'
+    json_filename = 'twitter_data.json'
     try:
-        if os.path.exists(csv_filename):
-            with open(csv_filename, "w", newline = '', encoding = 'utf-8-sig') as f:
-                pass
-            logger.info(f"Overriding existing {csv_filename} to start fresh")
+        # Create a new JSON file or clear the existing one
+        with open(json_filename, "w", encoding='utf-8') as f:
+            f.write("[]")  # Initialize with an empty JSON array
+        logger.info(f"Initialized {json_filename} to start fresh")
     except Exception as e:
-        logger.error(f"Error overriding existing CSV file: {e}")
+        logger.error(f"Error initializing JSON file: {e}")
 
     scraper = TwitterScraper()
     skipped_queries = set()
@@ -483,10 +452,21 @@ def main():
                         time.sleep(2)
 
                 if cycle_tweets:
-                    df = pd.DataFrame(cycle_tweets)
-                    df.to_csv(csv_filename, mode = 'a', header = not os.path.exists(csv_filename),
-                              index = False, encoding = 'utf-8-sig')
-                    logger.info(f"Appended {len(cycle_tweets)} tweets to {csv_filename}")
+                    # Read the existing JSON data
+                    try:
+                        with open(json_filename, 'r', encoding='utf-8') as f:
+                            existing_data = json.load(f)
+                    except json.JSONDecodeError:
+                        existing_data = []
+                    
+                    # Append new tweets
+                    existing_data.extend(cycle_tweets)
+                    
+                    # Write back the updated data
+                    with open(json_filename, 'w', encoding='utf-8') as f:
+                        json.dump(existing_data, f, ensure_ascii=False, indent=2)
+                    
+                    logger.info(f"Appended {len(cycle_tweets)} tweets to {json_filename}")
 
                 if processed_queries >= total_queries:
                     if skipped_queries:
