@@ -227,19 +227,32 @@ const SearchMemecoinAction: Action = {
         return { text: 'No memecoins found matching your search' };
       }
       
-      // Format the results
-      const searchResults = results.map(coin => ({
-        symbol: coin.symbol,
-        mention_count: coin.mention_count || 0,
-        risk_score: coin.risk_score || 'N/A',
-        potential_score: coin.potential_score || 'N/A',
-        community_score: coin.community_score || 'N/A',
-        red_flags: coin.red_flags || [],
-        positive_indicators: coin.positive_indicators || [],
-        recommendation: coin.recommendation || 'No recommendation available'
-      }));
+      // Format the response as readable text instead of JSON
+      let response = `=== Search Results for "${query}" ===\n\n`;
       
-      return { text: JSON.stringify({ searchResults }) };
+      results.forEach((coin, index) => {
+        response += `${index + 1}. **${coin.symbol}**\n`;
+        response += `   • Mention Count: ${coin.mention_count || 0}\n`;
+        response += `   • Risk Score: ${coin.risk_score || 'N/A'}/10 (${getRiskLevel(coin.risk_score)})\n`;
+        response += `   • Potential Score: ${coin.potential_score || 'N/A'}/10 (${getPotentialLevel(coin.potential_score)})\n`;
+        response += `   • Community Score: ${coin.community_score || 'N/A'}/10\n`;
+        
+        if (coin.red_flags && coin.red_flags.length > 0) {
+          response += `   • Key Risk: ${coin.red_flags[0]}\n`;
+        }
+        
+        if (coin.positive_indicators && coin.positive_indicators.length > 0) {
+          response += `   • Key Positive: ${coin.positive_indicators[0]}\n`;
+        }
+        
+        response += `   • Recommendation: ${coin.recommendation || 'No recommendation available'}\n`;
+        
+        if (index < results.length - 1) {
+          response += '\n';
+        }
+      });
+      
+      return { text: response };
     } catch (error) {
       console.error('Error searching memecoins:', error);
       return { text: 'Failed to search for coins' };
@@ -292,26 +305,45 @@ const MemecoinInfoAction: Action = {
         return { text: `No data found for coin: ${symbol}` };
       }
       
-      // Return detailed coin information
-      const coinInfo = {
-        symbol: coin.symbol,
-        mention_count: coin.mention_count || 0,
-        first_seen: coin.first_seen,
-        latest_seen: coin.latest_seen,
-        categories: coin.categories || [],
-        risk_score: coin.risk_score || 'N/A',
-        potential_score: coin.potential_score || 'N/A',
-        community_score: coin.community_score || 'N/A',
-        red_flags: coin.red_flags || [],
-        positive_indicators: coin.positive_indicators || [],
-        recommendation: coin.recommendation || 'No recommendation available',
-        telegram_links: coin.telegram_links || [],
-        other_links: coin.other_links || [],
-        sample_tweets: coin.sample_tweets || [],
-        market_data: coin.market_data || null
-      };
+      // Format the response as plain text instead of JSON
+      const response = `
+=== ${coin.symbol} Detailed Information ===
+
+Basic Information:
+• Symbol: ${coin.symbol}
+• Mention Count: ${coin.mention_count || 0}
+• First Seen: ${new Date(coin.first_seen).toLocaleString()}
+• Latest Seen: ${new Date(coin.latest_seen).toLocaleString()}
+• Categories: ${coin.categories?.join(', ') || 'None'}
+
+${coin.market_data ? `Market Data:
+• Price: $${coin.market_data.price_usd || 'N/A'}
+• 24h Volume: $${coin.market_data.volume_24h || 'N/A'}
+• 24h Price Change: ${coin.market_data.price_change_24h_percent || 'N/A'}%
+• 24h High: $${coin.market_data.high_24h || 'N/A'}
+• 24h Low: $${coin.market_data.low_24h || 'N/A'}
+` : ''}
+Analysis:
+• Risk Score: ${coin.risk_score || 'N/A'}/10 (${getRiskLevel(coin.risk_score)})
+• Potential Score: ${coin.potential_score || 'N/A'}/10 (${getPotentialLevel(coin.potential_score)})
+• Community Score: ${coin.community_score || 'N/A'}/10
+
+Risk Factors:
+• Red Flags: ${coin.red_flags?.length ? '\n  - ' + coin.red_flags.join('\n  - ') : 'None identified'}
+• Positive Indicators: ${coin.positive_indicators?.length ? '\n  - ' + coin.positive_indicators.join('\n  - ') : 'None identified'}
+
+Community Links:
+• Telegram Links: ${coin.telegram_links?.length ? '\n  - ' + coin.telegram_links.join('\n  - ') : 'None available'}
+• Other Links: ${coin.other_links?.length ? '\n  - ' + coin.other_links.join('\n  - ') : 'None available'}
+
+Recent Conversation:
+${coin.sample_tweets?.length ? '• ' + coin.sample_tweets.join('\n• ') : 'No recent conversations found'}
+
+Recommendation:
+${coin.recommendation || 'No specific recommendation available for this coin'}
+      `.trim();
       
-      return { text: JSON.stringify({ coinInfo }) };
+      return { text: response };
     } catch (error) {
       console.error('Error getting coin info:', error);
       return { text: 'Failed to get coin information' };
@@ -449,13 +481,30 @@ const MemecoinDataFreshnessAction: Action = {
       const now = new Date();
       const diffMinutes = Math.floor((now.getTime() - lastUpdated.getTime()) / (1000 * 60));
       
-      const result = {
-        lastUpdated: lastUpdated.toISOString(),
-        minutesAgo: diffMinutes,
-        message: `Memecoin data was last updated ${diffMinutes} minutes ago`
-      };
+      // Format as readable time period
+      let timeAgo;
+      if (diffMinutes < 60) {
+        timeAgo = `${diffMinutes} minutes ago`;
+      } else if (diffMinutes < 1440) {
+        const hours = Math.floor(diffMinutes / 60);
+        timeAgo = `${hours} hour${hours > 1 ? 's' : ''} ago`;
+      } else {
+        const days = Math.floor(diffMinutes / 1440);
+        timeAgo = `${days} day${days > 1 ? 's' : ''} ago`;
+      }
       
-      return { text: JSON.stringify(result) };
+      // Format the response as plain text instead of JSON
+      const response = `
+=== Memecoin Data Freshness Report ===
+
+• Data Last Updated: ${lastUpdated.toLocaleString()}
+• Data Age: ${timeAgo}
+• Status: ${diffMinutes < 180 ? '✅ Recent data' : '⚠️ Data might be outdated'}
+
+Note: We strive to keep our memecoin data as fresh as possible. Data is typically updated every 1-2 hours to reflect the latest market and social media trends.
+      `.trim();
+      
+      return { text: response };
     } catch (error) {
       console.error('Error checking data freshness:', error);
       return { text: 'Failed to check data freshness' };

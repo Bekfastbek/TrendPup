@@ -80,16 +80,64 @@ def extract_coin_symbols(helix_data):
     logger.info(f"Extracted {len(coins)} coin symbols from helix data")
     return coins
 
+def normalize_cookies(cookies):
+    """
+    Normalize cookie format for Playwright
+    Specifically fixes the sameSite attribute to be one of: "Strict", "Lax", or "None"
+    """
+    normalized_cookies = []
+    
+    for cookie in cookies:
+        # Create a copy of the cookie to modify
+        normalized_cookie = cookie.copy()
+        
+        # Fix sameSite attribute if it exists
+        if 'sameSite' in normalized_cookie:
+            same_site = normalized_cookie['sameSite']
+            # Handle None values
+            if same_site is None:
+                normalized_cookie['sameSite'] = 'Lax'  # Use Lax as default
+            else:
+                # Map common values to the correct formats
+                same_site_lower = str(same_site).lower()
+                if same_site_lower in ['no_restriction', 'none']:
+                    normalized_cookie['sameSite'] = 'None'
+                elif same_site_lower in ['lax']:
+                    normalized_cookie['sameSite'] = 'Lax'
+                elif same_site_lower in ['strict']:
+                    normalized_cookie['sameSite'] = 'Strict'
+                else:
+                    # Default to Lax if unknown
+                    normalized_cookie['sameSite'] = 'Lax'
+        
+        # Some cookies from browsers may have these fields that Playwright doesn't accept
+        for field in ['hostOnly', 'session', 'storeId']:
+            if field in normalized_cookie:
+                del normalized_cookie[field]
+                
+        # Add the normalized cookie
+        normalized_cookies.append(normalized_cookie)
+    
+    return normalized_cookies
+
 async def load_cookies(context):
     """Load cookies from the cookies file"""
     try:
         with open(COOKIES_FILE, 'r') as f:
-            cookies = json.load(f)
-        await context.add_cookies(cookies)
-        logger.info(f"Loaded {len(cookies)} cookies from {COOKIES_FILE}")
+            original_cookies = json.load(f)
+        
+        # Normalize cookies to match Playwright's expected format
+        normalized_cookies = normalize_cookies(original_cookies)
+        
+        logger.info(f"Normalizing {len(original_cookies)} cookies for Playwright compatibility")
+        
+        # Add normalized cookies to the browser context
+        await context.add_cookies(normalized_cookies)
+        logger.info(f"Successfully loaded {len(normalized_cookies)} cookies")
         return True
     except Exception as e:
         logger.error(f"Error loading cookies: {e}")
+        logger.error("You may need to refresh your Twitter cookies or provide them in the correct format")
         return False
 
 async def search_twitter_for_coin(page, coin_symbol):
@@ -98,92 +146,124 @@ async def search_twitter_for_coin(page, coin_symbol):
     
     try:
         logger.info(f"Searching Twitter for {coin_symbol}")
-        await page.goto(search_url, timeout=60000)
-        await page.wait_for_load_state('networkidle', timeout=10000)
         
-        # Wait for tweets to load
+        # Navigate to search URL with extended timeout
+        await page.goto(search_url, timeout=120000)  # Increase timeout to 2 minutes
+        
+        # Wait for DOM content loaded instead of networkidle (less strict)
         try:
-            await page.wait_for_selector('article[data-testid="tweet"]', timeout=10000)
-        except TimeoutError:
-            logger.warning(f"No tweets found for {coin_symbol}")
+            await page.wait_for_load_state('domcontentloaded', timeout=30000)
+        except Exception as e:
+            logger.warning(f"Page load state timeout for {coin_symbol}, continuing anyway: {e}")
+        
+        # Sleep a moment to allow page to stabilize
+        await asyncio.sleep(3)
+        
+        # Wait for tweets to load with more resilient approach
+        try:
+            # Try to find any tweet elements
+            tweet_selector = 'article[data-testid="tweet"]'
+            has_tweets = await page.query_selector(tweet_selector) is not None
+            
+            # If initial check doesn't find tweets, wait for them to appear
+            if not has_tweets:
+                logger.info(f"Waiting for tweets to load for {coin_symbol}...")
+                await page.wait_for_selector(tweet_selector, timeout=20000)
+        except Exception as e:
+            logger.warning(f"No tweets found for {coin_symbol}: {e}")
             return []
         
-        # Scroll to load more tweets
-        for _ in range(3):
-            await page.evaluate('window.scrollBy(0, 1000)')
-            await asyncio.sleep(1)
+        # Scroll to load more tweets with error handling
+        for i in range(3):
+            try:
+                await page.evaluate('window.scrollBy(0, 1000)')
+                await asyncio.sleep(2)  # Give more time for content to load
+            except Exception as e:
+                logger.warning(f"Error scrolling for {coin_symbol} (scroll #{i+1}): {e}")
+                # Continue despite scroll errors
         
-        # Extract tweets
-        tweets = await page.evaluate("""
-        () => {
-            const tweets = [];
-            const tweetElements = document.querySelectorAll('article[data-testid="tweet"]');
-            
-            tweetElements.forEach(tweet => {
-                try {
-                    // Username and handle
-                    const userElement = tweet.querySelector('div[data-testid="User-Name"]');
-                    const username = userElement ? userElement.querySelector('span:first-child')?.textContent : null;
-                    const handleElement = userElement ? userElement.querySelector('span:nth-child(2)')?.textContent : null;
-                    
-                    // Tweet text
-                    const textElement = tweet.querySelector('div[data-testid="tweetText"]');
-                    const text = textElement ? textElement.textContent : null;
-                    
-                    // Time
-                    const timeElement = tweet.querySelector('time');
-                    const timestamp = timeElement ? timeElement.getAttribute('datetime') : null;
-                    
-                    // Engagement metrics
-                    const replyElement = tweet.querySelector('div[data-testid="reply"]');
-                    const replyCount = replyElement ? replyElement.textContent : '0';
-                    
-                    const retweetElement = tweet.querySelector('div[data-testid="retweet"]');
-                    const retweetCount = retweetElement ? retweetElement.textContent : '0';
-                    
-                    const likeElement = tweet.querySelector('div[data-testid="like"]');
-                    const likeCount = likeElement ? likeElement.textContent : '0';
-                    
-                    // URL
-                    const linkElement = tweet.querySelector('a[href*="/status/"]');
-                    const url = linkElement ? 'https://twitter.com' + linkElement.getAttribute('href') : null;
-                    
-                    tweets.push({
-                        username,
-                        handle: handleElement,
-                        text,
-                        timestamp,
-                        reply_count: parseEngagementCount(replyCount),
-                        retweet_count: parseEngagementCount(retweetCount),
-                        like_count: parseEngagementCount(likeCount),
-                        url
-                    });
-                } catch (error) {
-                    console.error('Error parsing tweet:', error);
-                }
-            });
-            
-            function parseEngagementCount(countText) {
-                if (!countText) return 0;
-                countText = countText.trim();
-                if (countText === '') return 0;
+        # Extract tweets with improved error handling
+        try:
+            tweets = await page.evaluate("""
+            () => {
+                const tweets = [];
+                const tweetElements = document.querySelectorAll('article[data-testid="tweet"]');
                 
-                try {
-                    if (countText.includes('K')) {
-                        return parseInt(parseFloat(countText.replace('K', '')) * 1000);
-                    } else if (countText.includes('M')) {
-                        return parseInt(parseFloat(countText.replace('M', '')) * 1000000);
-                    } else {
-                        return parseInt(countText);
-                    }
-                } catch (e) {
-                    return 0;
+                if (!tweetElements || tweetElements.length === 0) {
+                    return tweets; // Return empty array if no tweets
                 }
+                
+                tweetElements.forEach(tweet => {
+                    try {
+                        // Username and handle
+                        const userElement = tweet.querySelector('div[data-testid="User-Name"]');
+                        const username = userElement ? userElement.querySelector('span:first-child')?.textContent : null;
+                        const handleElement = userElement ? userElement.querySelector('span:nth-child(2)')?.textContent : null;
+                        
+                        // Tweet text
+                        const textElement = tweet.querySelector('div[data-testid="tweetText"]');
+                        const text = textElement ? textElement.textContent : null;
+                        
+                        // Time
+                        const timeElement = tweet.querySelector('time');
+                        const timestamp = timeElement ? timeElement.getAttribute('datetime') : null;
+                        
+                        // Engagement metrics
+                        const replyElement = tweet.querySelector('div[data-testid="reply"]');
+                        const replyCount = replyElement ? replyElement.textContent : '0';
+                        
+                        const retweetElement = tweet.querySelector('div[data-testid="retweet"]');
+                        const retweetCount = retweetElement ? retweetElement.textContent : '0';
+                        
+                        const likeElement = tweet.querySelector('div[data-testid="like"]');
+                        const likeCount = likeElement ? likeElement.textContent : '0';
+                        
+                        // URL
+                        const linkElement = tweet.querySelector('a[href*="/status/"]');
+                        const url = linkElement ? 'https://twitter.com' + linkElement.getAttribute('href') : null;
+                        
+                        // Only add tweet if we have at least text or username
+                        if (text || username) {
+                            tweets.push({
+                                username: username || "Unknown",
+                                handle: handleElement || "",
+                                text: text || "(No text)",
+                                timestamp: timestamp || "",
+                                reply_count: parseEngagementCount(replyCount),
+                                retweet_count: parseEngagementCount(retweetCount),
+                                like_count: parseEngagementCount(likeCount),
+                                url: url || ""
+                            });
+                        }
+                    } catch (error) {
+                        console.error('Error parsing tweet:', error);
+                    }
+                });
+                
+                function parseEngagementCount(countText) {
+                    if (!countText) return 0;
+                    countText = countText.trim();
+                    if (countText === '') return 0;
+                    
+                    try {
+                        if (countText.includes('K')) {
+                            return parseInt(parseFloat(countText.replace('K', '')) * 1000);
+                        } else if (countText.includes('M')) {
+                            return parseInt(parseFloat(countText.replace('M', '')) * 1000000);
+                        } else {
+                            return parseInt(countText);
+                        }
+                    } catch (e) {
+                        return 0;
+                    }
+                }
+                
+                return tweets;
             }
-            
-            return tweets;
-        }
-        """)
+            """)
+        except Exception as e:
+            logger.error(f"Error extracting tweets for {coin_symbol}: {e}")
+            return []
         
         # Add metadata to tweets
         for tweet in tweets:
@@ -212,7 +292,7 @@ def analyze_sentiment_with_gemini(tweets_text, coin_symbol):
     
     try:
         # Configure the model
-        model = genai.GenerativeModel('gemini-pro')
+        model = genai.GenerativeModel('gemini-2.0-flash')
         
         # Create the prompt for Gemini
         prompt = f"""
@@ -383,25 +463,32 @@ async def scrape_twitter_for_coins():
     all_tweets = []
     
     async with async_playwright() as p:
-        # Launch browser options - now in headless mode
+        # Launch browser options - configured for virtual X server
         browser_launch_options = {
-            "headless": True,  # Changed to headless mode
-            "timeout": 60000,
+            "headless": False,  # Use "headed" mode with virtual X server
+            "timeout": 120000,  # Increase timeout to 2 minutes
             "args": [
                 "--disable-web-security",
                 "--disable-features=IsolateOrigins",
                 "--disable-site-isolation-trials",
                 "--no-sandbox",
-                "--disable-dev-shm-usage"
+                "--disable-dev-shm-usage",
+                "--disable-gpu",  # Disable GPU acceleration
+                "--mute-audio",   # Mute audio to avoid issues
+                "--window-size=1280,800"  # Set window size
             ]
         }
         
-        logger.info("Launching browser in headless mode")
+        logger.info("Launching browser in headed mode with virtual X server")
         browser = await p.chromium.launch(**browser_launch_options)
         context = await browser.new_context(
             viewport={"width": 1280, "height": 800},
             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/99.0.4844.51 Safari/537.36"
         )
+        
+        # Take screenshots for debugging
+        screenshot_dir = os.path.join(SCRIPT_DIR, "screenshots")
+        os.makedirs(screenshot_dir, exist_ok=True)
         
         # Load cookies
         cookies_loaded = await load_cookies(context)
@@ -413,23 +500,69 @@ async def scrape_twitter_for_coins():
         # Create a new page
         page = await context.new_page()
         
-        # First visit Twitter homepage to ensure cookies are loaded correctly
-        logger.info("Visiting Twitter homepage to initialize session")
-        await page.goto("https://twitter.com/home", timeout=60000)
-        await page.wait_for_load_state('networkidle', timeout=10000)
-        
-        # Scrape data for each coin
-        for coin in coin_symbols:
-            if not coin:
-                continue
+        try:
+            # First visit Twitter search page directly instead of homepage
+            # This is less likely to trigger login requirements or timeouts
+            general_search_url = "https://twitter.com/search?q=crypto&src=typed_query&f=live"
+            logger.info("Visiting Twitter search page to initialize session")
             
-            tweets = await search_twitter_for_coin(page, coin)
-            all_tweets.extend(tweets)
+            try:
+                await page.goto(general_search_url, timeout=120000)  # Increase timeout to 2 minutes
+                
+                # Use a more lenient approach to wait for page load
+                try:
+                    await page.wait_for_load_state('domcontentloaded', timeout=30000)
+                    logger.info("Twitter search page DOM loaded")
+                except TimeoutError:
+                    logger.warning("Timeout waiting for page load state, continuing anyway")
+                
+                # Wait for some content to appear
+                await asyncio.sleep(5)  # Give the page a moment to initialize
+                
+                # Take a screenshot after initial page load
+                await page.screenshot(path=os.path.join(screenshot_dir, "twitter_initial.png"))
+                logger.info(f"Saved initial screenshot")
+            except Exception as e:
+                logger.warning(f"Issue with initial page load: {e}")
+                logger.info("Will attempt to continue with searches anyway")
             
-            # Add a short delay between requests to avoid rate limiting
-            await asyncio.sleep(2)
-        
-        await browser.close()
+            # Scrape data for each coin
+            processed_count = 0
+            for coin in coin_symbols:
+                if not coin:
+                    continue
+                
+                try:
+                    tweets = await search_twitter_for_coin(page, coin)
+                    
+                    # Only take screenshots for some coins to avoid disk space issues
+                    if processed_count % 5 == 0:  # Take screenshot every 5 coins
+                        try:
+                            await page.screenshot(path=os.path.join(screenshot_dir, f"search_{coin}.png"))
+                        except Exception as e:
+                            logger.warning(f"Failed to take screenshot for {coin}: {e}")
+                    
+                    all_tweets.extend(tweets)
+                    processed_count += 1
+                    
+                    # Log progress periodically
+                    if processed_count % 10 == 0:
+                        logger.info(f"Processed {processed_count}/{len(coin_symbols)} coins, found {len(all_tweets)} tweets so far")
+                except Exception as e:
+                    logger.error(f"Error processing coin {coin}: {e}")
+                    # Continue with next coin
+                
+                # Add a short delay between requests to avoid rate limiting
+                await asyncio.sleep(3)  # Increase delay between requests
+        except Exception as e:
+            logger.error(f"Error during scraping: {e}")
+        finally:
+            try:
+                # Ensure browser is closed properly
+                await browser.close()
+                logger.info("Browser closed successfully")
+            except Exception as e:
+                logger.error(f"Error closing browser: {e}")
     
     # Save all tweets to file
     with open(TWITTER_DATA_FILE, 'w', encoding='utf-8') as f:

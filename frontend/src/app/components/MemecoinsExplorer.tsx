@@ -1,89 +1,34 @@
 'use client';
 
-import { useState } from 'react';
-import { FaSearch, FaChartLine, FaRegStar, FaStar, FaInfoCircle } from 'react-icons/fa';
+import { useState, useEffect } from 'react';
+import { FaSearch, FaChartLine, FaRegStar, FaStar, FaInfoCircle, FaSpinner } from 'react-icons/fa';
 import Image from 'next/image';
-
-interface Memecoin {
-  id: number;
-  name: string;
-  symbol: string;
-  logo: string;
-  price: number;
-  change24h: number;
-  marketCap: number;
-  risk: number;
-  potential: number;
-  favorite: boolean;
-}
+import { fetchHelixData, FormattedMemecoin } from '../services/helixData';
 
 export default function MemecoinsExplorer() {
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('trending');
-  
-  // Sample data for demonstration
-  const [memecoins, setMemecoins] = useState<Memecoin[]>([
-    {
-      id: 1,
-      name: 'Doge Coin',
-      symbol: 'DOGE',
-      logo: '/trendpup-logo.png',
-      price: 0.12,
-      change24h: 5.2,
-      marketCap: 18000000,
-      risk: 3,
-      potential: 7,
-      favorite: true
-    },
-    {
-      id: 2,
-      name: 'Shiba Inu',
-      symbol: 'SHIB',
-      logo: '/trendpup-logo.png',
-      price: 0.000028,
-      change24h: -2.1,
-      marketCap: 14000000,
-      risk: 5,
-      potential: 6,
-      favorite: false
-    },
-    {
-      id: 3,
-      name: 'PepeCoin',
-      symbol: 'PEPE',
-      logo: '/trendpup-logo.png',
-      price: 0.000008,
-      change24h: 12.4,
-      marketCap: 9800000,
-      risk: 8,
-      potential: 9,
-      favorite: false
-    },
-    {
-      id: 4,
-      name: 'Bonk',
-      symbol: 'BONK',
-      logo: '/trendpup-logo.png',
-      price: 0.00002,
-      change24h: 3.5,
-      marketCap: 7500000,
-      risk: 7,
-      potential: 8,
-      favorite: true
-    },
-    {
-      id: 5,
-      name: 'Floki Inu',
-      symbol: 'FLOKI',
-      logo: '/trendpup-logo.png',
-      price: 0.0002,
-      change24h: -1.3,
-      marketCap: 8700000,
-      risk: 6,
-      potential: 7,
-      favorite: false
+  const [memecoins, setMemecoins] = useState<FormattedMemecoin[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function loadHelixData() {
+      try {
+        setIsLoading(true);
+        const data = await fetchHelixData();
+        setMemecoins(data);
+        setError(null);
+      } catch (err) {
+        console.error('Failed to fetch helix data:', err);
+        setError('Failed to load memecoin data. Please try again later.');
+      } finally {
+        setIsLoading(false);
+      }
     }
-  ]);
+
+    loadHelixData();
+  }, []);
 
   const toggleFavorite = (id: number) => {
     setMemecoins(prevCoins => 
@@ -156,85 +101,105 @@ export default function MemecoinsExplorer() {
           </button>
         </div>
         
-        <div className="overflow-x-auto">
-          <table className="min-w-full">
-            <thead className="bg-trendpup-beige">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-trendpup-dark uppercase tracking-wider">Coin</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-trendpup-dark uppercase tracking-wider">Price</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-trendpup-dark uppercase tracking-wider">24h</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-trendpup-dark uppercase tracking-wider">Market Cap</th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-trendpup-dark uppercase tracking-wider">Risk</th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-trendpup-dark uppercase tracking-wider">Potential</th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-trendpup-dark uppercase tracking-wider">Favorite</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-trendpup-beige/50">
-              {displayedCoins.map((coin) => (
-                <tr key={coin.id} className="hover:bg-trendpup-beige/20">
-                  <td className="px-4 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <div className="flex-shrink-0 h-8 w-8 rounded-full overflow-hidden">
-                        <Image src={coin.logo} alt={coin.name} width={32} height={32} />
-                      </div>
-                      <div className="ml-4">
-                        <div className="text-sm font-medium text-trendpup-dark">{coin.name}</div>
-                        <div className="text-xs text-gray-500">{coin.symbol}</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-4 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    ${coin.price.toFixed(coin.price < 0.001 ? 8 : 6)}
-                  </td>
-                  <td className={`px-4 py-4 whitespace-nowrap text-right text-sm font-medium ${
-                    coin.change24h >= 0 ? 'text-green-600' : 'text-red-600'
-                  }`}>
-                    {coin.change24h >= 0 ? '+' : ''}{coin.change24h}%
-                  </td>
-                  <td className="px-4 py-4 whitespace-nowrap text-right text-sm text-gray-500">
-                    ${(coin.marketCap / 1000000).toFixed(2)}M
-                  </td>
-                  <td className="px-4 py-4 whitespace-nowrap text-center">
-                    <div className="flex items-center justify-center">
-                      <div className="w-24 bg-gray-200 rounded-full h-2.5">
-                        <div 
-                          className={`h-2.5 rounded-full ${
-                            coin.risk <= 3 ? 'bg-green-500' : 
-                            coin.risk <= 6 ? 'bg-yellow-500' : 'bg-red-500'
-                          }`} 
-                          style={{ width: `${coin.risk * 10}%` }}
-                        ></div>
-                      </div>
-                      <span className="ml-2 text-xs text-gray-500">{coin.risk}/10</span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-4 whitespace-nowrap text-center">
-                    <div className="flex items-center justify-center">
-                      <div className="w-24 bg-gray-200 rounded-full h-2.5">
-                        <div 
-                          className="h-2.5 bg-trendpup-orange rounded-full" 
-                          style={{ width: `${coin.potential * 10}%` }}
-                        ></div>
-                      </div>
-                      <span className="ml-2 text-xs text-gray-500">{coin.potential}/10</span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-4 whitespace-nowrap text-center">
-                    <button 
-                      onClick={() => toggleFavorite(coin.id)}
-                      className="text-lg"
-                    >
-                      {coin.favorite ? 
-                        <FaStar className="text-trendpup-orange" /> : 
-                        <FaRegStar className="text-gray-400 hover:text-trendpup-orange" />
-                      }
-                    </button>
-                  </td>
+        {isLoading ? (
+          <div className="flex justify-center items-center py-10">
+            <FaSpinner className="animate-spin text-trendpup-orange text-3xl" />
+            <span className="ml-2 text-gray-600">Loading memecoin data...</span>
+          </div>
+        ) : error ? (
+          <div className="text-center py-10 text-red-500">
+            <FaInfoCircle className="text-3xl mb-2 inline-block" />
+            <p>{error}</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full">
+              <thead className="bg-trendpup-beige">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-trendpup-dark uppercase tracking-wider">Coin</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-trendpup-dark uppercase tracking-wider">Price</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-trendpup-dark uppercase tracking-wider">24h</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-trendpup-dark uppercase tracking-wider">Market Cap</th>
+                  <th className="px-4 py-3 text-center text-xs font-medium text-trendpup-dark uppercase tracking-wider">Risk</th>
+                  <th className="px-4 py-3 text-center text-xs font-medium text-trendpup-dark uppercase tracking-wider">Potential</th>
+                  <th className="px-4 py-3 text-center text-xs font-medium text-trendpup-dark uppercase tracking-wider">Favorite</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y divide-trendpup-beige/50">
+                {displayedCoins.length > 0 ? (
+                  displayedCoins.map((coin) => (
+                    <tr key={coin.id} className="hover:bg-trendpup-beige/20">
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <div className="flex-shrink-0 h-8 w-8 rounded-full overflow-hidden">
+                            <Image src={coin.logo} alt={coin.name} width={32} height={32} />
+                          </div>
+                          <div className="ml-4">
+                            <div className="text-sm font-medium text-trendpup-dark">{coin.name}</div>
+                            <div className="text-xs text-gray-500">{coin.symbol}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        ${coin.price.toFixed(coin.price < 0.001 ? 8 : 6)}
+                      </td>
+                      <td className={`px-4 py-4 whitespace-nowrap text-right text-sm font-medium ${
+                        coin.change24h >= 0 ? 'text-green-600' : 'text-red-600'
+                      }`}>
+                        {coin.change24h >= 0 ? '+' : ''}{coin.change24h}%
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-right text-sm text-gray-500">
+                        ${(coin.marketCap / 1000000).toFixed(2)}M
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-center">
+                        <div className="flex items-center justify-center">
+                          <div className="w-24 bg-gray-200 rounded-full h-2.5">
+                            <div 
+                              className={`h-2.5 rounded-full ${
+                                coin.risk <= 3 ? 'bg-green-500' : 
+                                coin.risk <= 6 ? 'bg-yellow-500' : 'bg-red-500'
+                              }`} 
+                              style={{ width: `${coin.risk * 10}%` }}
+                            ></div>
+                          </div>
+                          <span className="ml-2 text-xs text-gray-500">{coin.risk}/10</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-center">
+                        <div className="flex items-center justify-center">
+                          <div className="w-24 bg-gray-200 rounded-full h-2.5">
+                            <div 
+                              className="h-2.5 bg-trendpup-orange rounded-full" 
+                              style={{ width: `${coin.potential * 10}%` }}
+                            ></div>
+                          </div>
+                          <span className="ml-2 text-xs text-gray-500">{coin.potential}/10</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-center">
+                        <button 
+                          onClick={() => toggleFavorite(coin.id)}
+                          className="text-lg"
+                        >
+                          {coin.favorite ? 
+                            <FaStar className="text-trendpup-orange" /> : 
+                            <FaRegStar className="text-gray-400 hover:text-trendpup-orange" />
+                          }
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={7} className="px-4 py-10 text-center text-gray-500">
+                      No memecoins found matching your search criteria
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );
