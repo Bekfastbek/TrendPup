@@ -129,28 +129,32 @@ const fallbackData: HelixDataResponse = {
       "volume": "N/A",
       "change_24h": "+0.03%",
       "timestamp": "2025-03-18T17:54:51.947Z",
-      "market_id": "0x2a3e06be3b6c13730f801c66010b355c3d28d5bd4ee736eeabbfa56e0a735b58"
+      "market_id": "0x2a3e06be3b6c13730f801c66010b355c3d28d5bd4ee736eeabbfa56e0a735b58",
+      "helix_link": "https://helixapp.com/spot/stinj-inj"
     },
     {
       "symbol": "HDRO/INJ",
       "price": "0.001931",
       "volume": "N/A",
       "change_24h": "+6.51%",
-      "timestamp": "2025-03-18T17:54:51.947Z"
+      "timestamp": "2025-03-18T17:54:51.947Z",
+      "helix_link": "https://helixapp.com/spot/hdro-inj"
     },
     {
       "symbol": "NEPT/INJ",
       "price": "0.03867",
       "volume": "N/A",
       "change_24h": "+6.18%",
-      "timestamp": "2025-03-18T17:54:51.948Z"
+      "timestamp": "2025-03-18T17:54:51.948Z",
+      "helix_link": "https://helixapp.com/spot/nept-inj"
     },
     {
       "symbol": "AGENT/INJ",
       "price": "0.03247",
       "volume": "N/A",
       "change_24h": "-1.00%",
-      "timestamp": "2025-03-18T17:54:51.948Z"
+      "timestamp": "2025-03-18T17:54:51.948Z",
+      "helix_link": "https://helixapp.com/spot/agent-inj"
     }
   ]
 };
@@ -164,6 +168,9 @@ const processHelixData = (data: HelixCoin[]): FormattedMemecoin[] => {
     
     const price = parsePrice(coin.price);
     
+    // Simply use the helix_link directly from the data
+    const helixLink = coin.helix_link || '';
+    
     return {
       id: index + 1,
       name,
@@ -175,9 +182,9 @@ const processHelixData = (data: HelixCoin[]): FormattedMemecoin[] => {
       risk: calculateRisk(price, coin.change_24h),
       potential: calculatePotential(price, coin.change_24h),
       favorite: false,
-      // Add the new detailed data fields if available
+      helixLink: helixLink,
+      // Include other optional fields if they exist
       marketId: coin.market_id,
-      helixLink: coin.helix_link,
       tickSize: coin.tick_size,
       minOrderSize: coin.min_limit_order_size,
       high24h: parseNumericValue(coin.high_24h),

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { FaSearch, FaChartLine, FaRegStar, FaStar, FaInfoCircle, FaSpinner } from 'react-icons/fa';
 import Image from 'next/image';
 import { fetchHelixData, FormattedMemecoin } from '../services/helixData';
@@ -48,6 +48,23 @@ export default function MemecoinsExplorer() {
     : activeTab === 'favorites' 
     ? filteredCoins.filter(coin => coin.favorite)
     : filteredCoins.sort((a, b) => a.risk - b.risk);
+
+  // Create a helper function for opening links
+  const openHelixLink = useCallback((url: string) => {
+    if (!url) {
+      console.error("Attempted to open empty URL");
+      return;
+    }
+    
+    console.log("Opening Helix link:", url);
+    
+    try {
+      // Simple direct window open approach
+      window.open(url, '_blank', 'noopener,noreferrer');
+    } catch (error) {
+      console.error("Error opening link:", error);
+    }
+  }, []);
 
   return (
     <div className="bg-white rounded-xl shadow-lg border border-trendpup-brown/20 overflow-hidden">
@@ -128,14 +145,26 @@ export default function MemecoinsExplorer() {
               <tbody className="divide-y divide-trendpup-beige/50">
                 {displayedCoins.length > 0 ? (
                   displayedCoins.map((coin) => (
-                    <tr key={coin.id} className="hover:bg-trendpup-beige/20">
+                    <tr 
+                      key={coin.id} 
+                      className="hover:bg-trendpup-beige/20 cursor-pointer"
+                      onClick={(e) => {
+                        // Only navigate if click wasn't on the favorite button
+                        if (!e.defaultPrevented && coin.helixLink) {
+                          openHelixLink(coin.helixLink);
+                        }
+                      }}
+                    >
                       <td className="px-4 py-4 whitespace-nowrap">
                         <div className="flex items-center">
                           <div className="flex-shrink-0 h-8 w-8 rounded-full overflow-hidden">
                             <Image src={coin.logo} alt={coin.name} width={32} height={32} />
                           </div>
                           <div className="ml-4">
-                            <div className="text-sm font-medium text-trendpup-dark">{coin.name}</div>
+                            <div className="text-sm font-medium text-trendpup-dark hover:text-trendpup-orange">
+                              {coin.name}
+                              <span className="ml-1 text-xs text-trendpup-orange">↗</span>
+                            </div>
                             <div className="text-xs text-gray-500">{coin.symbol}</div>
                           </div>
                         </div>
@@ -178,7 +207,10 @@ export default function MemecoinsExplorer() {
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap text-center">
                         <button 
-                          onClick={() => toggleFavorite(coin.id)}
+                          onClick={(e) => {
+                            e.preventDefault(); // Prevent tr onClick from firing
+                            toggleFavorite(coin.id);
+                          }}
                           className="text-lg"
                         >
                           {coin.favorite ? 
