@@ -1,0 +1,387 @@
+{
+  "data": [
+    {
+      "symbol": "HINJ/INJ",
+      "price": "1",
+      "volume": "N/A",
+      "change_24h": "+0.09%",
+      "timestamp": "2025-03-18T17:54:51.946Z"
+    },
+    {
+      "symbol": "STINJ/INJ",
+      "price": "1.3816",
+      "volume": "N/A",
+      "change_24h": "+0.03%",
+      "timestamp": "2025-03-18T17:54:51.947Z"
+    },
+    {
+      "symbol": "HDRO/INJ",
+      "price": "0.001931",
+      "volume": "N/A",
+      "change_24h": "+6.51%",
+      "timestamp": "2025-03-18T17:54:51.947Z"
+    },
+    {
+      "symbol": "QUNT/INJ",
+      "price": "0.0",
+      "volume": "N/A",
+      "change_24h": "-0.48%",
+      "timestamp": "2025-03-18T17:54:51.947Z"
+    },
+    {
+      "symbol": "NEPT/INJ",
+      "price": "0.03867",
+      "volume": "N/A",
+      "change_24h": "+6.18%",
+      "timestamp": "2025-03-18T17:54:51.948Z"
+    },
+    {
+      "symbol": "AGENT/INJ",
+      "price": "0.03247",
+      "volume": "N/A",
+      "change_24h": "-1.00%",
+      "timestamp": "2025-03-18T17:54:51.948Z"
+    },
+    {
+      "symbol": "ZIG/INJ",
+      "price": "0.008737",
+      "volume": "N/A",
+      "change_24h": "+1.65%",
+      "timestamp": "2025-03-18T17:54:51.948Z"
+    },
+    {
+      "symbol": "NINJA/INJ",
+      "price": "0.0",
+      "volume": "N/A",
+      "change_24h": "+3.60%",
+      "timestamp": "2025-03-18T17:54:51.948Z"
+    },
+    {
+      "symbol": "SHROOM/INJ",
+      "price": "0.0",
+      "volume": "N/A",
+      "change_24h": "-10.84%",
+      "timestamp": "2025-03-18T17:54:51.949Z"
+    },
+    {
+      "symbol": "TALIS/INJ",
+      "price": "0.0",
+      "volume": "N/A",
+      "change_24h": "+1.27%",
+      "timestamp": "2025-03-18T17:54:51.949Z"
+    },
+    {
+      "symbol": "BLACK/INJ",
+      "price": "0.0",
+      "volume": "N/A",
+      "change_24h": "+0.21%",
+      "timestamp": "2025-03-18T17:54:51.949Z"
+    },
+    {
+      "symbol": "DOJO/INJ",
+      "price": "0.0",
+      "volume": "N/A",
+      "change_24h": "-4.22%",
+      "timestamp": "2025-03-18T17:54:51.949Z"
+    },
+    {
+      "symbol": "XIII/INJ",
+      "price": "0.0",
+      "volume": "N/A",
+      "change_24h": "N/A",
+      "timestamp": "2025-03-18T17:54:51.950Z"
+    },
+    {
+      "symbol": "NINJ/INJ",
+      "price": "0.4904",
+      "volume": "N/A",
+      "change_24h": "-5.84%",
+      "timestamp": "2025-03-18T17:54:51.950Z"
+    },
+    {
+      "symbol": "LVN/INJ",
+      "price": "0.0",
+      "volume": "N/A",
+      "change_24h": "+1.76%",
+      "timestamp": "2025-03-18T17:54:51.950Z"
+    },
+    {
+      "symbol": "ASG/INJ",
+      "price": "0.0",
+      "volume": "N/A",
+      "change_24h": "-2.45%",
+      "timestamp": "2025-03-18T17:54:51.951Z"
+    },
+    {
+      "symbol": "PYTH/INJ",
+      "price": "0.01548",
+      "volume": "N/A",
+      "change_24h": "+0.65%",
+      "timestamp": "2025-03-18T17:54:51.951Z"
+    },
+    {
+      "symbol": "NONJA/INJ",
+      "price": "0.0",
+      "volume": "N/A",
+      "change_24h": "+0.31%",
+      "timestamp": "2025-03-18T17:54:51.952Z"
+    },
+    {
+      "symbol": "GINGER/INJ",
+      "price": "0.0",
+      "volume": "N/A",
+      "change_24h": "-2.44%",
+      "timestamp": "2025-03-18T17:54:51.952Z"
+    },
+    {
+      "symbol": "SAI/INJ",
+      "price": "0.005",
+      "volume": "N/A",
+      "change_24h": "+2.04%",
+      "timestamp": "2025-03-18T17:54:51.952Z"
+    },
+    {
+      "symbol": "AUTISM/INJ",
+      "price": "0.0",
+      "volume": "N/A",
+      "change_24h": "N/A",
+      "timestamp": "2025-03-18T17:54:51.952Z"
+    },
+    {
+      "symbol": "KIRA/INJ",
+      "price": "0.0",
+      "volume": "N/A",
+      "change_24h": "+1.23%",
+      "timestamp": "2025-03-18T17:54:51.953Z"
+    },
+    {
+      "symbol": "JNI/INJ",
+      "price": "0.0",
+      "volume": "N/A",
+      "change_24h": "N/A",
+      "timestamp": "2025-03-18T17:54:51.953Z"
+    },
+    {
+      "symbol": "REALTRUMPEPE/INJ",
+      "price": "1000.00",
+      "volume": "N/A",
+      "change_24h": "N/A",
+      "timestamp": "2025-03-18T17:54:51.953Z"
+    },
+    {
+      "symbol": "BILLS/INJ",
+      "price": "1,792.6030.00",
+      "volume": "N/A",
+      "change_24h": "N/A",
+      "timestamp": "2025-03-18T17:54:51.953Z"
+    },
+    {
+      "symbol": "APP/INJ",
+      "price": "0.0",
+      "volume": "N/A",
+      "change_24h": "N/A",
+      "timestamp": "2025-03-18T17:54:51.954Z"
+    },
+    {
+      "symbol": "ANDR/INJ",
+      "price": "0.0",
+      "volume": "N/A",
+      "change_24h": "N/A",
+      "timestamp": "2025-03-18T17:54:51.954Z"
+    },
+    {
+      "symbol": "WHALE/INJ",
+      "price": "0.0",
+      "volume": "N/A",
+      "change_24h": "N/A",
+      "timestamp": "2025-03-18T17:54:51.954Z"
+    },
+    {
+      "symbol": "KATANA/INJ",
+      "price": "00.00",
+      "volume": "N/A",
+      "change_24h": "N/A",
+      "timestamp": "2025-03-18T17:54:51.954Z"
+    },
+    {
+      "symbol": "BRETT/INJ",
+      "price": "00.00",
+      "volume": "N/A",
+      "change_24h": "N/A",
+      "timestamp": "2025-03-18T17:54:51.954Z"
+    },
+    {
+      "symbol": "SNOWY/INJ",
+      "price": "00.00",
+      "volume": "N/A",
+      "change_24h": "N/A",
+      "timestamp": "2025-03-18T17:54:51.955Z"
+    },
+    {
+      "symbol": "PHUC/INJ",
+      "price": "00.00",
+      "volume": "N/A",
+      "change_24h": "N/A",
+      "timestamp": "2025-03-18T17:54:51.955Z"
+    },
+    {
+      "symbol": "INJA/INJ",
+      "price": "00.00",
+      "volume": "N/A",
+      "change_24h": "N/A",
+      "timestamp": "2025-03-18T17:54:51.955Z"
+    },
+    {
+      "symbol": "KOGA/INJ",
+      "price": "00.00",
+      "volume": "N/A",
+      "change_24h": "N/A",
+      "timestamp": "2025-03-18T17:54:51.955Z"
+    },
+    {
+      "symbol": "NWIF/INJ",
+      "price": "00.00",
+      "volume": "N/A",
+      "change_24h": "N/A",
+      "timestamp": "2025-03-18T17:54:51.956Z"
+    },
+    {
+      "symbol": "UICIDE/INJ",
+      "price": "00.00",
+      "volume": "N/A",
+      "change_24h": "N/A",
+      "timestamp": "2025-03-18T17:54:51.956Z"
+    },
+    {
+      "symbol": "NONJAKTIF/INJ",
+      "price": "00.00",
+      "volume": "N/A",
+      "change_24h": "N/A",
+      "timestamp": "2025-03-18T17:54:51.956Z"
+    },
+    {
+      "symbol": "STRD/INJ",
+      "price": "00.00",
+      "volume": "N/A",
+      "change_24h": "N/A",
+      "timestamp": "2025-03-18T17:54:51.956Z"
+    },
+    {
+      "symbol": "LEO/INJ",
+      "price": "00.00",
+      "volume": "N/A",
+      "change_24h": "N/A",
+      "timestamp": "2025-03-18T17:54:51.957Z"
+    },
+    {
+      "symbol": "SMELLY/INJ",
+      "price": "00.00",
+      "volume": "N/A",
+      "change_24h": "N/A",
+      "timestamp": "2025-03-18T17:54:51.957Z"
+    },
+    {
+      "symbol": "MOTHER/INJ",
+      "price": "00.00",
+      "volume": "N/A",
+      "change_24h": "N/A",
+      "timestamp": "2025-03-18T17:54:51.960Z"
+    },
+    {
+      "symbol": "SPUUN/INJ",
+      "price": "00.00",
+      "volume": "N/A",
+      "change_24h": "N/A",
+      "timestamp": "2025-03-18T17:54:51.961Z"
+    },
+    {
+      "symbol": "GME/INJ",
+      "price": "00.00",
+      "volume": "N/A",
+      "change_24h": "N/A",
+      "timestamp": "2025-03-18T17:54:51.961Z"
+    },
+    {
+      "symbol": "NLT/INJ",
+      "price": "00.00",
+      "volume": "N/A",
+      "change_24h": "N/A",
+      "timestamp": "2025-03-18T17:54:51.961Z"
+    },
+    {
+      "symbol": "TEST/INJ",
+      "price": "00.00",
+      "volume": "N/A",
+      "change_24h": "N/A",
+      "timestamp": "2025-03-18T17:54:51.962Z"
+    },
+    {
+      "symbol": "COKE/INJ",
+      "price": "00.00",
+      "volume": "N/A",
+      "change_24h": "N/A",
+      "timestamp": "2025-03-18T17:54:51.962Z"
+    },
+    {
+      "symbol": "IOTX/INJ",
+      "price": "00.00",
+      "volume": "N/A",
+      "change_24h": "N/A",
+      "timestamp": "2025-03-18T17:54:51.962Z"
+    },
+    {
+      "symbol": "SNS/INJ",
+      "price": "00.00",
+      "volume": "N/A",
+      "change_24h": "N/A",
+      "timestamp": "2025-03-18T17:54:51.963Z"
+    },
+    {
+      "symbol": "GIGA/INJ",
+      "price": "00.00",
+      "volume": "N/A",
+      "change_24h": "N/A",
+      "timestamp": "2025-03-18T17:54:51.964Z"
+    },
+    {
+      "symbol": "PAIN/INJ",
+      "price": "00.00",
+      "volume": "N/A",
+      "change_24h": "N/A",
+      "timestamp": "2025-03-18T17:54:51.964Z"
+    },
+    {
+      "symbol": "BTORO/INJ",
+      "price": "00.00",
+      "volume": "N/A",
+      "change_24h": "N/A",
+      "timestamp": "2025-03-18T17:54:51.964Z"
+    },
+    {
+      "symbol": "KISH6/INJ",
+      "price": "6",
+      "volume": "N/A",
+      "change_24h": "N/A",
+      "timestamp": "2025-03-18T17:54:51.965Z"
+    },
+    {
+      "symbol": "ZOB/INJ",
+      "price": "00.00",
+      "volume": "N/A",
+      "change_24h": "N/A",
+      "timestamp": "2025-03-18T17:54:51.965Z"
+    },
+    {
+      "symbol": "TRUMPEPE/INJ",
+      "price": "00.00",
+      "volume": "N/A",
+      "change_24h": "N/A",
+      "timestamp": "2025-03-18T17:54:51.965Z"
+    }
+  ],
+  "metadata": {
+    "source": "https://helixapp.com/spot/inj-usdt",
+    "timestamp": "2025-03-18T17:54:52.011499",
+    "count": 54
+  }
+}
