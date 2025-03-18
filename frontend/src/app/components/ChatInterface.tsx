@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { IoSendSharp } from 'react-icons/io5';
-import { FaRobot } from 'react-icons/fa';
-import { FaUser } from 'react-icons/fa';
+import { FaDog, FaUser } from 'react-icons/fa';
+import Image from 'next/image';
 
 interface Message {
   type: 'user' | 'assistant';
@@ -11,7 +11,11 @@ interface Message {
   timestamp: Date;
 }
 
-export default function ChatInterface() {
+interface ChatInterfaceProps {
+  fullPage?: boolean;
+}
+
+export default function ChatInterface({ fullPage = false }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [ws, setWs] = useState<WebSocket | null>(null);
@@ -48,7 +52,7 @@ export default function ChatInterface() {
           if (data.type === 'connected') {
             setMessages(prev => [...prev, {
               type: 'assistant',
-              content: 'Hello! I\'m your AI assistant. How can I help you today?',
+              content: 'Hello! I\'m TrendPup, your AI assistant for memecoin intelligence. How can I help you discover the next big opportunity?',
               timestamp: new Date()
             }]);
           } else if (data.type === 'message' && data.text) {
@@ -106,7 +110,6 @@ export default function ChatInterface() {
     inputRef.current?.focus();
   };
 
-  // Use an arrow function to ensure proper binding to the component context
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -118,21 +121,31 @@ export default function ChatInterface() {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
+  const containerHeight = fullPage ? 'h-[calc(100vh-8rem)]' : 'h-[calc(100vh-12rem)]';
+
   return (
-    <div className="flex flex-col h-[calc(100vh-2rem)] max-w-4xl mx-auto my-4 bg-white rounded-lg shadow-lg overflow-hidden">
-      {/* Header */}
-      <div className="bg-indigo-600 text-white p-4 flex items-center">
-        <FaRobot className="text-2xl mr-2" />
-        <div>
-          <h1 className="text-xl font-semibold">AI Assistant</h1>
-          <p className="text-sm opacity-75">
-            {isConnected ? 'Online' : 'Connecting...'}
-          </p>
+    <div className={`flex flex-col ${containerHeight} max-w-4xl mx-auto rounded-xl shadow-xl overflow-hidden border border-trendpup-brown/20 bg-white`}>
+      {!fullPage && (
+        <div className="bg-trendpup-dark text-white p-4 flex items-center">
+          <div className="flex-shrink-0 mr-3">
+            <Image 
+              src="/trendpup-logo.png" 
+              alt="TrendPup Logo" 
+              width={32} 
+              height={32}
+            />
+          </div>
+          <div>
+            <h1 className="text-xl font-semibold">TrendPup Assistant</h1>
+            <p className="text-sm opacity-75">
+              {isConnected ? 'Online - Ready to spot trends' : 'Connecting...'}
+            </p>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
+      <div className="flex-1 overflow-y-auto p-4 bg-trendpup-light">
         <div className="space-y-4">
           {messages.map((msg, idx) => (
             <div
@@ -141,19 +154,19 @@ export default function ChatInterface() {
             >
               <div className={`flex items-start max-w-[80%] ${msg.type === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
                 <div className={`flex-shrink-0 h-8 w-8 rounded-full flex items-center justify-center ${
-                  msg.type === 'user' ? 'bg-indigo-600 ml-2' : 'bg-gray-400 mr-2'
+                  msg.type === 'user' ? 'bg-trendpup-orange ml-2' : 'bg-trendpup-brown mr-2'
                 }`}>
                   {msg.type === 'user' ? (
                     <FaUser className="text-white text-sm" />
                   ) : (
-                    <FaRobot className="text-white text-sm" />
+                    <FaDog className="text-white text-sm" />
                   )}
                 </div>
                 <div
                   className={`rounded-lg p-3 ${
                     msg.type === 'user'
-                      ? 'bg-indigo-600 text-white'
-                      : 'bg-white text-gray-800 shadow-sm'
+                      ? 'bg-trendpup-orange text-white'
+                      : 'bg-white text-trendpup-dark border border-trendpup-brown/20'
                   }`}
                 >
                   <p className="whitespace-pre-wrap">{msg.content}</p>
@@ -167,14 +180,14 @@ export default function ChatInterface() {
           {isTyping && (
             <div className="flex justify-start">
               <div className="flex items-start">
-                <div className="flex-shrink-0 h-8 w-8 rounded-full bg-gray-400 mr-2 flex items-center justify-center">
-                  <FaRobot className="text-white text-sm" />
+                <div className="flex-shrink-0 h-8 w-8 rounded-full bg-trendpup-brown mr-2 flex items-center justify-center">
+                  <FaDog className="text-white text-sm" />
                 </div>
-                <div className="bg-white text-gray-800 rounded-lg p-3 shadow-sm">
+                <div className="bg-white text-gray-800 rounded-lg p-3 border border-trendpup-brown/20">
                   <div className="flex space-x-1">
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                    <div className="w-2 h-2 bg-trendpup-brown rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                    <div className="w-2 h-2 bg-trendpup-brown rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                    <div className="w-2 h-2 bg-trendpup-brown rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
                   </div>
                 </div>
               </div>
@@ -185,22 +198,22 @@ export default function ChatInterface() {
       </div>
 
       {/* Input */}
-      <div className="p-4 bg-white border-t">
+      <div className="p-4 bg-white border-t border-trendpup-brown/10">
         <div className="flex items-end space-x-2">
           <textarea
             ref={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyPress={handleKeyPress}
-            placeholder={isConnected ? "Type your message..." : "Connecting..."}
+            placeholder={isConnected ? "Ask about memecoins, trends, or market insights..." : "Connecting..."}
             disabled={!isConnected}
-            className="flex-1 p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none h-12 max-h-32 min-h-[3rem]"
+            className="flex-1 p-3 border border-trendpup-brown/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-trendpup-orange resize-none h-12 max-h-32 min-h-[3rem]"
             rows={1}
           />
           <button
             onClick={sendMessage}
             disabled={!isConnected || !input.trim()}
-            className="p-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+            className="p-3 bg-trendpup-orange text-white rounded-lg hover:bg-orange-600 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
           >
             <IoSendSharp className="text-xl" />
           </button>

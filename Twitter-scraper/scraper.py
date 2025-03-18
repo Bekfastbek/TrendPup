@@ -349,7 +349,6 @@ class TwitterScraper:
         total_attempts = 0
         max_retries = 10
         max_total_attempts = 20
-        retry_delay = 120
 
         while total_attempts < max_total_attempts:
             try:
@@ -368,14 +367,8 @@ class TwitterScraper:
 
                 if retry_count >= max_retries:
                     logger.warning(
-                        f"No tweets found for '{query}' after {retry_count} attempts. Pausing for 15 minutes...")
-                    time.sleep(retry_delay)
-                    retry_count = 0
-                    self.cleanup()
-                    self.setup_browser()
-                    if not self.login():
-                        raise Exception("Login failed after pause")
-                    continue
+                        f"No tweets found for '{query}' after {retry_count} attempts. Skipping this query.")
+                    return []  # Just return empty list and skip this query entirely
 
                 logger.info(f"No tweets found for '{query}'. Attempt {retry_count}/{max_retries}. Retrying...")
                 time.sleep(2)
@@ -391,9 +384,16 @@ class TwitterScraper:
 
 def create_search_queries(scraper):
     return {
-        'general': ['new memecoin', 'upcoming memecoin', 'memecoin launch'],
-        'trending': ['viral memecoin', 'trending memecoin', 'hot memecoin'],
-        'presale': ['memecoin presale', 'token presale', 'new token launch']
+        'injective_pairs': [
+            'INJ trading pair', 'INJ pair trading', 'INJ/USD trading',
+            'INJ/USDT trading', 'INJ/ETH trading', 'INJ/BTC trading',
+            'INJ price chart', 'INJ trading volume', 'INJ market depth',
+            'INJ orderbook', 'INJ liquidity', 'INJ trading fees',
+            'INJ spot trading', 'INJ perpetual', 'INJ futures',
+            'INJ margin trading', 'INJ leverage trading',
+            'INJ trading bot', 'INJ trading strategy',
+            'INJ technical analysis', 'INJ market analysis'
+        ]
     }
 
 
@@ -466,8 +466,8 @@ def main():
                         logger.info(f"Recycling {len(skipped_queries)} previously skipped queries in next cycle")
                         skipped_queries.clear()
 
-                    logger.info("All keywords processed. Waiting for 15 minutes before next cycle...")
-                    time.sleep(1800)
+                    logger.info("All keywords processed. Waiting for 1 hour before next cycle...")
+                    time.sleep(3600)
 
             except Exception as e:
                 logger.error(f"Error in discovery cycle: {e}")

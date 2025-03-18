@@ -31,7 +31,7 @@ class TwitterDataHandler(FileSystemEventHandler):
                 logger.info("Waiting 5 seconds to ensure file is fully written...")
                 time.sleep(5)
                 
-                logger.info("Starting Gemini analyzer...")
+                logger.info("Starting coin analyzer...")
                 try:
                     result = subprocess.run(['python3', self.analyzer_path], 
                                            capture_output=True, text=True)
@@ -46,7 +46,7 @@ class TwitterPipeline:
     def __init__(self):
         self.base_dir = os.path.dirname(os.path.abspath(__file__))
         self.scraper_path = os.path.join(self.base_dir, 'scraper.py')
-        self.analyzer_path = os.path.join(self.base_dir, 'gemini_analyzer.py')
+        self.analyzer_path = os.path.join(self.base_dir, 'coin_analyzer.py')
         self.data_file = os.path.join(self.base_dir, 'twitter_data.json')
         self.xvfb_process = None
         self.scraper_process = None
@@ -112,7 +112,7 @@ class TwitterPipeline:
         if not os.path.exists(self.data_file):
             logger.info(f"Creating empty {self.data_file}")
             with open(self.data_file, 'w') as f:
-                f.write('{}')
+                f.write('[]')
         
         # Set up the file watcher
         event_handler = TwitterDataHandler(self.analyzer_path)

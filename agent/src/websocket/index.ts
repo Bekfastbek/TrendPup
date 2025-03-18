@@ -1,4 +1,4 @@
-import { WebSocketServer } from 'ws';
+import { WebSocketServer, WebSocket } from 'ws';
 import { elizaLogger } from '@elizaos/core';
 import type { Character } from '@elizaos/core';
 import type { DirectClient } from '@elizaos/client-direct';
@@ -10,9 +10,14 @@ interface WebSocketMessage {
   content: string;
 }
 
+// Extend WebSocket type to include isAlive property
+interface ExtendedWebSocket extends WebSocket {
+  isAlive: boolean;
+}
+
 export class WebSocketHandler {
   private wss: WebSocketServer;
-  private clients: Set<any>;
+  private clients: Set<ExtendedWebSocket>;
   private directClient: DirectClient;
   private characters: Character[];
   private serverPort: number;
@@ -20,7 +25,11 @@ export class WebSocketHandler {
   constructor(port: number, directClient: DirectClient, characters: Character[]) {
     this.wss = new WebSocketServer({ 
       port,
-      host: '0.0.0.0' // Listen on all network interfaces
+      host: '0.0.0.0', // Listen on all network interfaces
+      clientTracking: true,
+      // Add keep-alive settings
+      perMessageDeflate: false,
+      maxPayload: 1048576 // 1MB
     });
     this.clients = new Set();
     this.directClient = directClient;
@@ -31,15 +40,31 @@ export class WebSocketHandler {
   }
 
   private setupWebSocketServer() {
-    this.wss.on('connection', (ws) => {
+    this.wss.on('connection', (ws: ExtendedWebSocket) => {
       elizaLogger.success('New WebSocket client connected');
       this.clients.add(ws);
+
+      // Set up heartbeat
+      ws.isAlive = true;
+      ws.on('pong', () => {
+        ws.isAlive = true;
+      });
 
       // Send initial connection message
       ws.send(JSON.stringify({
         type: 'connected',
         message: 'Connected to TrendPup Assistant'
       }));
+
+      // Set up ping interval
+      const interval = setInterval(() => {
+        if (ws.isAlive === false) {
+          elizaLogger.warn('Client connection dead, terminating');
+          return ws.terminate();
+        }
+        ws.isAlive = false;
+        ws.ping();
+      }, 30000); // Send ping every 30 seconds
 
       ws.on('message', async (data) => {
         try {
@@ -110,11 +135,13 @@ export class WebSocketHandler {
 
       ws.on('close', () => {
         elizaLogger.warn('Client disconnected');
+        clearInterval(interval); // Clear the ping interval
         this.clients.delete(ws);
       });
 
       ws.on('error', (error) => {
         elizaLogger.error('WebSocket error:', error);
+        clearInterval(interval); // Clear the ping interval
         this.clients.delete(ws);
       });
     });

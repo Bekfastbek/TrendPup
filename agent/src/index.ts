@@ -5,10 +5,12 @@ import {
   settings,
   stringToUuid,
   type Character,
+  type Plugin,
 } from "@elizaos/core";
 import { bootstrapPlugin } from "@elizaos/plugin-bootstrap";
 import { createNodePlugin } from "@elizaos/plugin-node";
 import { solanaPlugin } from "@elizaos/plugin-solana";
+import { injectivePlugin } from "@elizaos/plugin-injective";
 import fs from "fs";
 import net from "net";
 import path from "path";
@@ -25,7 +27,7 @@ import {
 import { initializeDatabase } from "./database/index.ts";
 import { WebSocketHandler } from "./websocket/index.ts";
 import { BalanceActions } from "./actions/balance-actions.ts";
-import { addMemecoinActions } from "./actions/memecoin-actions.ts";
+import { addMemecoinActions, MemecoinActions } from "./actions/memecoin-actions.ts";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -52,27 +54,44 @@ export function createAgent(
 
   nodePlugin ??= createNodePlugin();
 
-  const runtime = new AgentRuntime({
+  // Create the plugins array with proper typing
+  const plugins: Plugin[] = [
+    bootstrapPlugin,
+    nodePlugin,
+  ];
+
+  // Add conditional plugins
+  if (character.settings?.secrets?.WALLET_PUBLIC_KEY) {
+    plugins.push(solanaPlugin);
+  }
+
+  // Instead of trying to directly add the plugin based on the character's plugin list,
+  // we'll just unconditionally add it for InjectiveAssistant
+  if (character.name === "InjectiveAssistant") {
+    plugins.push(injectivePlugin);
+    elizaLogger.debug("Added Injective plugin for InjectiveAssistant");
+  }
+
+  // Choose appropriate actions based on character name
+  let actions = [];
+  if (character.name === "InjectiveAssistant") {
+    actions = [BalanceActions, MemecoinActions];
+    elizaLogger.debug("Added Balance and Memecoin Actions for InjectiveAssistant");
+  }
+
+  return new AgentRuntime({
     databaseAdapter: db,
     token,
     modelProvider: character.modelProvider,
     evaluators: [],
     character,
-    plugins: [
-      bootstrapPlugin,
-      nodePlugin,
-      character.settings?.secrets?.WALLET_PUBLIC_KEY ? solanaPlugin : null,
-    ].filter(Boolean),
+    plugins: plugins, // Explicitly using our typed array
     providers: [],
-    actions: [
-      ...BalanceActions
-    ],
+    actions: actions,
     services: [],
     managers: [],
     cacheManager: cache,
   });
-
-  return runtime;
 }
 
 async function startAgent(character: Character, directClient: DirectClient) {
