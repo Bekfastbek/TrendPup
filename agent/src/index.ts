@@ -24,6 +24,8 @@ import {
 } from "./config/index.ts";
 import { initializeDatabase } from "./database/index.ts";
 import { WebSocketHandler } from "./websocket/index.ts";
+import { BalanceActions } from "./actions/balance-actions.ts";
+import { addMemecoinActions } from "./actions/memecoin-actions.ts";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -50,7 +52,7 @@ export function createAgent(
 
   nodePlugin ??= createNodePlugin();
 
-  return new AgentRuntime({
+  const runtime = new AgentRuntime({
     databaseAdapter: db,
     token,
     modelProvider: character.modelProvider,
@@ -62,11 +64,15 @@ export function createAgent(
       character.settings?.secrets?.WALLET_PUBLIC_KEY ? solanaPlugin : null,
     ].filter(Boolean),
     providers: [],
-    actions: [],
+    actions: [
+      ...BalanceActions
+    ],
     services: [],
     managers: [],
     cacheManager: cache,
   });
+
+  return runtime;
 }
 
 async function startAgent(character: Character, directClient: DirectClient) {
@@ -89,6 +95,9 @@ async function startAgent(character: Character, directClient: DirectClient) {
     const runtime = createAgent(character, db, cache, token);
 
     await runtime.initialize();
+    
+    // Add memecoin actions to the agent after initialization
+    addMemecoinActions(runtime);
 
     runtime.clients = await initializeClients(character, runtime);
 

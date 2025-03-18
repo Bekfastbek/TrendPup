@@ -8,8 +8,6 @@ import os
 import csv
 import sys
 
-with open('scraper_config.json', 'r') as f:
-    config = json.load(f)
 
 logging.basicConfig(
     level = logging.INFO,
@@ -26,11 +24,6 @@ COOKIES_FILE = "twitter_cookies.json"
 
 class TwitterScraper:
     def __init__(self):
-        self.credentials = {
-            'email': config['email'],
-            'username': config['username'],
-            'password': config['password']
-        }
         self.playwright = None
         self.browser = None
         self.context = None

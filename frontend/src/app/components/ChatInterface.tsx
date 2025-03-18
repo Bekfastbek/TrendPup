@@ -27,7 +27,7 @@ export default function ChatInterface() {
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const socket = new WebSocket(`${wsProtocol}//${window.location.hostname}:8080`);
+      const socket = new WebSocket(`${wsProtocol}//${window.location.host}/ws`);
 
       socket.onopen = () => {
         setIsConnected(true);
@@ -106,6 +106,7 @@ export default function ChatInterface() {
     inputRef.current?.focus();
   };
 
+  // Use an arrow function to ensure proper binding to the component context
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
