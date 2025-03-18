@@ -86,9 +86,10 @@ async def scrape_helix_inj_pairs():
             await asyncio.sleep(10)
             
             # Take a screenshot before interaction
-            before_screenshot_path = os.path.join(SCRIPT_DIR, "helix_before_interaction.png")
-            await page.screenshot(path=before_screenshot_path)
-            logger.info(f"Screenshot before interaction saved to {before_screenshot_path}")
+            # Disabling screenshots to save storage space
+            # before_screenshot_path = os.path.join(SCRIPT_DIR, "helix_before_interaction.png")
+            # await page.screenshot(path=before_screenshot_path)
+            # logger.info(f"Screenshot before interaction saved to {before_screenshot_path}")
             
             # Click on the "All Markets" dropdown button
             logger.info("Looking for 'All Markets' dropdown button...")
@@ -148,9 +149,10 @@ async def scrape_helix_inj_pairs():
                     logger.warning("Could not find 'All Markets' element via content analysis")
             
             # Take screenshot after clicking dropdown
-            after_click_screenshot_path = os.path.join(SCRIPT_DIR, "helix_after_click.png")
-            await page.screenshot(path=after_click_screenshot_path)
-            logger.info(f"Screenshot after dropdown click saved to {after_click_screenshot_path}")
+            # Disabling screenshots to save storage space
+            # after_click_screenshot_path = os.path.join(SCRIPT_DIR, "helix_after_click.png")
+            # await page.screenshot(path=after_click_screenshot_path)
+            # logger.info(f"Screenshot after dropdown click saved to {after_click_screenshot_path}")
             
             # Wait for dropdown to appear and search for "/INJ"
             if clicked:
@@ -186,9 +188,10 @@ async def scrape_helix_inj_pairs():
                     logger.warning("Could not find search input in dropdown")
             
             # Take a screenshot after searching
-            after_search_screenshot_path = os.path.join(SCRIPT_DIR, "helix_after_search.png")
-            await page.screenshot(path=after_search_screenshot_path)
-            logger.info(f"Screenshot after search saved to {after_search_screenshot_path}")
+            # Disabling screenshots to save storage space
+            # after_search_screenshot_path = os.path.join(SCRIPT_DIR, "helix_after_search.png")
+            # await page.screenshot(path=after_search_screenshot_path)
+            # logger.info(f"Screenshot after search saved to {after_search_screenshot_path}")
             
             # Wait for search results
             logger.info("Waiting for search results to load...")
@@ -197,6 +200,306 @@ async def scrape_helix_inj_pairs():
             # Extract cryptocurrency data
             logger.info("Extracting cryptocurrency data from search results...")
             
+            # First, extract the list of trading pairs to navigate to
+            trading_pairs = await page.evaluate('''
+            () => {
+                // This function runs in the browser context
+                console.log("Browser context: Extracting trading pair names for navigation");
+                
+                const tradingPairs = [];
+                // Look for elements that might contain trading pair names
+                const elements = Array.from(document.querySelectorAll('*'))
+                    .filter(el => {
+                        const text = el.textContent || '';
+                        return /([A-Z0-9]+)\/INJ/i.test(text) && 
+                               !text.includes("All Markets") && 
+                               text.trim().length < 20; // Avoid broader elements containing multiple pairs
+                    });
+                
+                elements.forEach(el => {
+                    const text = el.textContent || '';
+                    const symbolMatch = text.match(/([A-Z0-9]+)\/INJ/i);
+                    if (symbolMatch) {
+                        const symbol = symbolMatch[0].toUpperCase();
+                        const elementInfo = {
+                            symbol: symbol,
+                            textContent: text
+                        };
+                        tradingPairs.push(elementInfo);
+                    }
+                });
+                
+                console.log(`Browser context: Found ${tradingPairs.length} trading pairs to navigate to`);
+                return tradingPairs;
+            }
+            ''')
+            
+            logger.info(f"Found {len(trading_pairs)} trading pairs to navigate through")
+            
+            # Screenshot after finding pairs
+            # Disabling screenshots to save storage space
+            # pairs_screenshot_path = os.path.join(SCRIPT_DIR, "helix_found_pairs.png")
+            # await page.screenshot(path=pairs_screenshot_path)
+            # logger.info(f"Screenshot after finding pairs saved to {pairs_screenshot_path}")
+            
+            # Initialize list to store detailed crypto data
+            detailed_crypto_data = []
+            
+            # Track pairs we've already processed to avoid duplicates
+            processed_pairs = set()
+            
+            # Process each trading pair
+            for pair_info in trading_pairs:
+                pair = pair_info['symbol']
+                
+                # Skip duplicates
+                if pair in processed_pairs:
+                    continue
+                
+                processed_pairs.add(pair)
+                logger.info(f"Processing trading pair: {pair}")
+                
+                # Extract base symbol (the part before /INJ)
+                base_symbol = pair.split('/')[0]
+                
+                try:
+                    # Construct the URL for this specific pair
+                    pair_url = f"https://helixapp.com/spot/{base_symbol.lower()}-inj"
+                    logger.info(f"Navigating to pair URL: {pair_url}")
+                    
+                    # Navigate to the pair's page
+                    await page.goto(pair_url, timeout=30000, wait_until="domcontentloaded")
+                    
+                    # Wait for page to load
+                    try:
+                        await page.wait_for_load_state("networkidle", timeout=15000)
+                    except TimeoutError:
+                        logger.warning("Network idle timeout reached, continuing anyway")
+                    
+                    # Wait for some additional time for dynamic content
+                    await asyncio.sleep(5)
+                    
+                    # Screenshot of the pair page
+                    # Disabling screenshots to save storage space
+                    # pair_page_screenshot = os.path.join(SCRIPT_DIR, f"helix_{base_symbol}_page.png")
+                    # await page.screenshot(path=pair_page_screenshot)
+                    # logger.info(f"Screenshot of {pair} page saved to {pair_page_screenshot}")
+                    
+                    # Click on the Info tab
+                    logger.info("Looking for 'Info' tab...")
+                    
+                    info_tab_selectors = [
+                        "text=Info",
+                        "[aria-label='Info']",
+                        "button:has-text('Info')",
+                        "div:has-text('Info'):not(:has(*))",
+                        "//button[contains(., 'Info')]",
+                        "//div[contains(., 'Info') and not(child::*)]",
+                        "a:has-text('Info')",
+                        "a[href*='info']",
+                        "li:has-text('Info')"
+                    ]
+                    
+                    info_clicked = False
+                    for selector in info_tab_selectors:
+                        try:
+                            logger.info(f"Trying to click Info tab using selector: {selector}")
+                            # Wait for the element to be visible and clickable
+                            await page.wait_for_selector(selector, state="visible", timeout=5000)
+                            await page.click(selector)
+                            logger.info(f"Successfully clicked 'Info' tab using selector: {selector}")
+                            info_clicked = True
+                            break
+                        except Exception as e:
+                            logger.warning(f"Failed to click Info tab with selector '{selector}': {e}")
+                    
+                    if not info_clicked:
+                        logger.warning(f"Could not click on 'Info' tab for {pair}, trying to find by position")
+                        
+                        # Try to find the Info tab by analyzing the page content
+                        tab_element = await page.evaluate('''
+                        () => {
+                            // Find elements containing "Info" text that look like tabs
+                            const elements = Array.from(document.querySelectorAll('*'))
+                                .filter(el => el.textContent.trim() === 'Info' && 
+                                       !el.querySelector('*') && // No child elements 
+                                       el.offsetWidth > 0 && el.offsetHeight > 0); // Is visible
+                            
+                            if (elements.length > 0) {
+                                // Get coordinates for click
+                                const rect = elements[0].getBoundingClientRect();
+                                return {
+                                    x: rect.x + rect.width / 2,
+                                    y: rect.y + rect.height / 2,
+                                    found: true
+                                };
+                            }
+                            return { found: false };
+                        }
+                        ''')
+                        
+                        if tab_element and tab_element.get('found'):
+                            logger.info(f"Found 'Info' tab via content analysis, clicking at coordinates: {tab_element.get('x')}, {tab_element.get('y')}")
+                            await page.mouse.click(tab_element.get('x'), tab_element.get('y'))
+                            info_clicked = True
+                        else:
+                            logger.warning(f"Could not find 'Info' tab for {pair}")
+                    
+                    # Take screenshot after clicking Info tab
+                    # Disabling screenshots to save storage space
+                    # info_tab_screenshot = os.path.join(SCRIPT_DIR, f"helix_{base_symbol}_info_tab.png")
+                    # await page.screenshot(path=info_tab_screenshot)
+                    # logger.info(f"Screenshot after clicking Info tab for {pair} saved to {info_tab_screenshot}")
+                    
+                    # Wait for Info tab content to load
+                    await asyncio.sleep(3)
+                    
+                    # Extract market data including Market ID
+                    market_data = await page.evaluate('''
+                    (pair) => {
+                        console.log(`Browser context: Extracting market data for ${pair}`);
+                        
+                        // Initialize data object
+                        const data = {
+                            symbol: pair,
+                            market_id: null,
+                            market_name: null,
+                            tick_size: null,
+                            min_limit_order_size: null,
+                            price: null,
+                            volume_24h: null,
+                            high_24h: null,
+                            low_24h: null,
+                            change_24h: null
+                        };
+                        
+                        // Function to find value by label
+                        function findValueByLabel(label) {
+                            // Find all elements containing the label
+                            const labelElements = Array.from(document.querySelectorAll('*'))
+                                .filter(el => el.textContent.includes(label) && !el.querySelector('*'));
+                            
+                            if (labelElements.length > 0) {
+                                // Try to find the corresponding value in a sibling or nearby element
+                                let valueElement = null;
+                                const labelElement = labelElements[0];
+                                
+                                // Check parent's children
+                                if (labelElement.parentElement) {
+                                    const siblings = Array.from(labelElement.parentElement.children);
+                                    valueElement = siblings.find(el => el !== labelElement && el.textContent.trim() !== '');
+                                }
+                                
+                                // If not found, try the next sibling or adjacent element
+                                if (!valueElement) {
+                                    let current = labelElement;
+                                    while (current.nextSibling) {
+                                        current = current.nextSibling;
+                                        if (current.nodeType === 1 && current.textContent.trim() !== '') {
+                                            valueElement = current;
+                                            break;
+                                        }
+                                    }
+                                }
+                                
+                                // Return the value if found
+                                if (valueElement) {
+                                    return valueElement.textContent.trim();
+                                }
+                            }
+                            return null;
+                        }
+                        
+                        // Extract various market data
+                        data.market_name = findValueByLabel('Market Name:');
+                        data.tick_size = findValueByLabel('Tick Size:');
+                        data.min_limit_order_size = findValueByLabel('Min. Limit Order Size:');
+                        data.market_id = findValueByLabel('Market ID:');
+                        
+                        // Also get data from the main market header
+                        try {
+                            // Parse price from header
+                            const priceElements = Array.from(document.querySelectorAll('*'))
+                                .filter(el => /\d+\.\d+/.test(el.textContent) && 
+                                       !el.querySelector('*') && 
+                                       el.textContent.length < 15);
+                                       
+                            if (priceElements.length > 0) {
+                                data.price = priceElements[0].textContent.trim();
+                            }
+                            
+                            // Look for 24h volume, high, low
+                            const volumeElement = document.querySelector('[data-testid="volume-24h"], :has-text("Volume (24h)")');
+                            if (volumeElement) {
+                                const volText = volumeElement.textContent;
+                                const match = volText.match(/[\d.,]+\s*[A-Z]+/);
+                                if (match) data.volume_24h = match[0];
+                            }
+                            
+                            // Find 24h high
+                            const highElement = document.querySelector('[data-testid="24h-high"], :has-text("24h High")');
+                            if (highElement) {
+                                const highText = highElement.textContent;
+                                const match = highText.match(/[\d.,]+/);
+                                if (match) data.high_24h = match[0];
+                            }
+                            
+                            // Find 24h low
+                            const lowElement = document.querySelector('[data-testid="24h-low"], :has-text("24h Low")');
+                            if (lowElement) {
+                                const lowText = lowElement.textContent;
+                                const match = lowText.match(/[\d.,]+/);
+                                if (match) data.low_24h = match[0];
+                            }
+                            
+                            // Find 24h change
+                            const changeElements = Array.from(document.querySelectorAll('*'))
+                                .filter(el => /[+-][\d.,]+%/.test(el.textContent) && !el.querySelector('*'));
+                                
+                            if (changeElements.length > 0) {
+                                const match = changeElements[0].textContent.match(/[+-][\d.,]+%/);
+                                if (match) data.change_24h = match[0];
+                            }
+                        } catch (error) {
+                            console.error(`Error extracting market header data: ${error.message}`);
+                        }
+                        
+                        // Add timestamp
+                        data.timestamp = new Date().toISOString();
+                        
+                        return data;
+                    }
+                    ''', pair)
+                    
+                    # Add Helix app link for direct access
+                    market_data['helix_link'] = pair_url
+                    
+                    logger.info(f"Extracted market data for {pair}: {json.dumps(market_data, indent=2)}")
+                    detailed_crypto_data.append(market_data)
+                    
+                except Exception as e:
+                    logger.error(f"Error processing {pair}: {e}")
+                    # Take error screenshot
+                    # Disabling screenshots to save storage space
+                    # error_screenshot = os.path.join(SCRIPT_DIR, f"helix_{base_symbol}_error.png")
+                    # await page.screenshot(path=error_screenshot)
+                    # logger.info(f"Error screenshot for {pair} saved to {error_screenshot}")
+                    
+                    # Add minimal data for failed processing
+                    detailed_crypto_data.append({
+                        "symbol": pair,
+                        "error": str(e),
+                        "timestamp": datetime.now().isoformat()
+                    })
+            
+            # Save the detailed data
+            data_path = os.path.join(SCRIPT_DIR, "helix_detailed_data.json")
+            with open(data_path, 'w') as f:
+                json.dump({"data": detailed_crypto_data}, f, indent=2)
+            
+            logger.info(f"Saved detailed data for {len(detailed_crypto_data)} pairs to {data_path}")
+            
+            # Also extract the basic list of cryptocurrencies as before
             cryptos = await page.evaluate('''
             () => {
                 // This function runs in the browser context
@@ -353,12 +656,13 @@ async def scrape_helix_inj_pairs():
             
         except Exception as e:
             # Take a screenshot of the error state
-            error_screenshot_path = os.path.join(SCRIPT_DIR, "helix_error_screenshot.png")
-            try:
-                await page.screenshot(path=error_screenshot_path)
-                logger.info(f"Error state screenshot saved to {error_screenshot_path}")
-            except:
-                logger.error("Failed to capture error screenshot")
+            # Disabling screenshots to save storage space
+            # error_screenshot_path = os.path.join(SCRIPT_DIR, "helix_error_screenshot.png")
+            # try:
+            #     await page.screenshot(path=error_screenshot_path)
+            #     logger.info(f"Error state screenshot saved to {error_screenshot_path}")
+            # except Exception:
+            #     logger.error("Failed to capture error screenshot")
                 
             logger.error(f"Error during scraping: {e}", exc_info=True)
             await browser.close()

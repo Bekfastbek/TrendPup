@@ -74,24 +74,10 @@ export default function Home() {
   const getDefaultWindowSize = (id: string): WindowSize => {
     switch(id) {
       case 'chat':
-        return { width: 500, height: 500 };
+        return { width: 600, height: 600 };
       default:
         return { width: 500, height: 400 };
     }
-  };
-
-  // Calculate initial position for new windows
-  const calculateInitialPosition = (): WindowPosition => {
-    if (!containerRef.current) return { x: 100, y: 100 };
-    
-    const containerWidth = containerRef.current.clientWidth;
-    const containerHeight = containerRef.current.clientHeight;
-    
-    // Center the window with some randomness to avoid perfect stacking
-    return {
-      x: (containerWidth / 2) - 250 + Math.random() * 50 - 25,
-      y: (containerHeight / 2) - 200 + Math.random() * 50 - 25
-    };
   };
 
   const toggleWindow = (id: string) => {
@@ -111,10 +97,17 @@ export default function Home() {
       }
     } else {
       // Open new window
+      const windowSize = getDefaultWindowSize(id);
+      const containerWidth = containerRef.current?.clientWidth || window.innerWidth;
+      const containerHeight = containerRef.current?.clientHeight || window.innerHeight;
+      
       const newWindow: OpenWindow = {
         id,
-        position: calculateInitialPosition(),
-        size: getDefaultWindowSize(id),
+        position: {
+          x: (containerWidth / 2) - (windowSize.width / 2),
+          y: (containerHeight / 2) - (windowSize.height / 2)
+        },
+        size: windowSize,
         zIndex: nextZIndex
       };
       
@@ -317,7 +310,11 @@ export default function Home() {
         return (
           <div 
             className={`bg-white rounded-xl shadow-2xl border-2 border-black overflow-hidden ${activeClass}`}
-            style={windowStyle}
+            style={{
+              ...windowStyle,
+              width: `${Math.max(windowData.size.width, 500)}px`,
+              height: `${Math.max(windowData.size.height, 450)}px`,
+            }}
           >
             <div 
               className="bg-gradient-to-r from-trendpup-dark to-gray-800 text-white p-3 flex justify-between items-center cursor-move"
@@ -342,7 +339,7 @@ export default function Home() {
               </button>
             </div>
             <div 
-              className="h-[calc(100%-48px)]"
+              className="h-[calc(100%-48px)] overflow-hidden"
               onMouseDown={(e) => {
                 e.stopPropagation();
               }}
@@ -688,15 +685,22 @@ export default function Home() {
     console.log("Opening multiple windows:", ids);
     const newWindows = ids
       .filter(id => !openWindows.some(w => w.id === id))
-      .map((id, index) => ({
-        id,
-        position: {
-          x: 100 + (index * 50),
-          y: 100 + (index * 50)
-        },
-        size: getDefaultWindowSize(id),
-        zIndex: nextZIndex + index
-      }));
+      .map((id, index) => {
+        // Center windows based on container size
+        const containerWidth = containerRef.current?.clientWidth || window.innerWidth;
+        const containerHeight = containerRef.current?.clientHeight || window.innerHeight;
+        const windowSize = getDefaultWindowSize(id);
+        
+        return {
+          id,
+          position: {
+            x: (containerWidth / 2) - (windowSize.width / 2) + (index * 40),
+            y: (containerHeight / 2) - (windowSize.height / 2) + (index * 40)
+          },
+          size: windowSize,
+          zIndex: nextZIndex + index
+        };
+      });
     
     if (newWindows.length > 0) {
       console.log("Adding new windows:", newWindows);
@@ -742,10 +746,13 @@ export default function Home() {
                 Get Started
               </button>
               <button 
-                onClick={() => {
+                onClick={(e) => {
+                  e.stopPropagation();
                   setAppStarted(true);
                   setChatMode(true);
-                toggleWindow('chat');
+                  setTimeout(() => {
+                    toggleWindow('chat');
+                  }, 100);
                 }}
                 className="px-6 md:px-8 py-3 bg-trendpup-beige text-trendpup-dark rounded-lg font-medium hover:bg-trendpup-beige/80 transition-colors shadow-sm"
               >

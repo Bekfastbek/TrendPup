@@ -1,84 +1,81 @@
-# Helix App Scraper
+# Helix Protocol Scraper
 
-This script scrapes cryptocurrency data from Helix App (https://helixapp.com/spot/inj-usdt) for all pairs ending with "/INJ".
+A specialized web scraper designed to extract cryptocurrency data from the Helix App, focusing on trading pairs ending with /INJ.
 
-## Requirements
+## Features
 
-- Python 3.7+
-- Playwright
-- Xvfb (X Virtual Frame Buffer) for running headed browser on headless servers
+### Basic Scraping
+- Extracts a list of all cryptocurrency pairs with INJ
+- Captures basic market information (symbol, price, volume, 24h change)
 
-## Setup
+### Enhanced Detailed Scraping (New)
+- Navigates to each individual coin's page
+- Clicks on the Info tab to access detailed market information
+- Extracts comprehensive data including:
+  - Market ID (contract address)
+  - Market Name
+  - Tick Size
+  - Min. Limit Order Size
+  - 24h High/Low prices
+  - Direct link to the coin's Helix page
 
-1. Install the required packages:
-   ```
-   pip install -r requirements_helix.txt
-   ```
+## Output Files
 
-2. Install Playwright browsers:
-   ```
-   python -m playwright install
-   ```
+The scraper generates two main data files:
+1. `helix_data.json` - Basic list of all cryptocurrency pairs with INJ
+2. `helix_detailed_data.json` - Comprehensive data including Market IDs and Helix links
 
-3. Install Xvfb (on Debian/Ubuntu):
-   ```
-   sudo apt-get update
-   sudo apt-get install -y xvfb
-   ```
+## Debugging & Monitoring
+
+The scraper takes screenshots at various stages to help with debugging:
+- Initial page load
+- After clicking All Markets
+- After searching for /INJ pairs
+- Individual coin pages
+- Info tabs for each coin
+- Error states (when they occur)
+
+All activity is logged to `helix_scraper.log` for monitoring and troubleshooting.
 
 ## Usage
 
-### With Virtual Display (for servers without a display)
-
-1. Start Xvfb:
-   ```
-   Xvfb :99 -screen 0 1280x1024x24 &
-   export DISPLAY=:99
-   ```
-
-2. Navigate to the Twitter-scraper directory and run the scraper:
-   ```
-   cd Twitter-scraper
-   python helix_scraper.py
-   ```
-
-### On a system with a physical display
-
-Simply navigate to the Twitter-scraper directory and run the script:
-```
-cd Twitter-scraper
+```bash
 python helix_scraper.py
 ```
 
-The browser will open visibly and you'll be able to see the scraping process.
+## Requirements
 
-## Output
-
-The script generates the following files in the Twitter-scraper directory:
-- `helix_data.json`: Contains all scraped cryptocurrency data in JSON format
-- `helix_scraper.log`: Log file with details about the scraping process
-- `helix_screenshot.png`: Screenshot of the page for debugging
-- `helix_page.html`: HTML content of the page for debugging (if initial extraction method fails)
+See `requirements_helix.txt` for the necessary dependencies. The scraper uses Playwright for browser automation.
 
 ## Data Structure
 
-The output JSON has the following structure:
+The enhanced detailed data JSON file (`helix_detailed_data.json`) follows this structure:
+
 ```json
 {
   "data": [
     {
-      "symbol": "BTC/INJ",
-      "price": "123.45",
-      "volume": "1.2M",
-      "change_24h": "+1.23%",
-      "timestamp": "2023-05-01T12:34:56.789Z"
+      "symbol": "HINJ/INJ",
+      "market_id": "0x1b1e062b3306f26ae3af3c354a10c1cf38b00dcb42917f038ba3fc14978b1dd8",
+      "market_name": "hINJ/INJ",
+      "tick_size": "0.0001",
+      "min_limit_order_size": "0.001", 
+      "price": "0.991",
+      "volume_24h": "16,183.328 INJ",
+      "high_24h": "0.9941",
+      "low_24h": "0.9901",
+      "change_24h": "+0.08%",
+      "helix_link": "https://helixapp.com/spot/hinj-inj",
+      "timestamp": "2023-04-25T12:34:56.789Z"
     },
-    ...
-  ],
-  "metadata": {
-    "source": "https://helixapp.com/spot/inj-usdt",
-    "timestamp": "2023-05-01T12:34:56.789Z",
-    "count": 10
-  }
+    // More coins...
+  ]
 }
-``` 
+```
+
+## Notes for Integration
+
+When integrating with other systems, you can:
+- Use the market_id as a unique identifier for each trading pair
+- Follow the helix_link for direct access to each coin's page
+- Monitor timestamp values to ensure data freshness 

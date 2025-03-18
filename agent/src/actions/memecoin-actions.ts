@@ -383,17 +383,61 @@ const RiskAssessmentAction: Action = {
     // Check if action has symbol param or use the first mentioned coin
     const symbol = args?.symbol || (mentionedCoins.length > 0 ? mentionedCoins[0] : null);
     
-    if (!symbol) {
-      return { text: 'Please specify a coin symbol for risk assessment' };
-    }
-    
     try {
       const data = await readMemecoinsData();
-      if (!data || !data.coins || !Array.isArray(data.coins)) {
+      if (!data || (!data.coins && !data.top_investment_coins) || (!Array.isArray(data.coins) && !Array.isArray(data.top_investment_coins))) {
         return { text: 'No memecoin data available' };
       }
       
-      const coin = data.coins.find(c => 
+      // If no specific coin was mentioned but user is asking for investment advice,
+      // provide recommendations for top coins
+      if (!symbol) {
+        // Check if the user is asking for investment advice
+        const isAskingForAdvice = 
+          text.toLowerCase().includes('invest') || 
+          text.toLowerCase().includes('buy') || 
+          text.toLowerCase().includes('recommend') || 
+          text.toLowerCase().includes('best coin');
+        
+        if (isAskingForAdvice && data.top_investment_coins && Array.isArray(data.top_investment_coins)) {
+          // Provide a list of recommended coins based on investment score
+          const topCoins = data.top_investment_coins.filter(coin => coin.investment_score > 0).slice(0, 5);
+          
+          if (topCoins.length === 0) {
+            return { text: "TrendPup doesn't recommend investing in any coins at the moment. Market looks risky! 🐶🚨" };
+          }
+          
+          let response = `=== TrendPup's TOP INVESTMENT RECOMMENDATIONS 🐶💎 ===\n\n`;
+          response += `TrendPup has analyzed the market and found these promising coins for you to consider:\n\n`;
+          
+          topCoins.forEach((coin, index) => {
+            const emoji = 
+              coin.investment_score > 15 ? "🔥" : 
+              coin.investment_score > 10 ? "💎" : 
+              coin.investment_score > 5 ? "⭐" : "👀";
+              
+            response += `${index + 1}. ${emoji} **${coin.symbol}** - Investment Score: ${coin.investment_score.toFixed(2)}\n`;
+            response += `   • Price: $${coin.price}\n`;
+            response += `   • 24h Change: ${coin.price_change_24h}%\n`;
+            if (coin.sentiment_score) {
+              response += `   • Sentiment: ${coin.sentiment_score > 0.5 ? "Bullish 📈" : 
+                               coin.sentiment_score > 0 ? "Neutral 🔍" : "Bearish 📉"}\n`;
+            }
+            response += `   • Analysis: ${coin.gemini_analysis?.substring(0, 150)}...\n\n`;
+          });
+          
+          response += `\nRemember: TrendPup's advice is based on data analysis, but all investments carry risk. Always do your own research before investing! 🐶👍`;
+          
+          return { text: response };
+        }
+        
+        return { text: 'Please specify a coin symbol for risk assessment' };
+      }
+      
+      // Original logic for specific coin analysis
+      const coin = data.coins ? data.coins.find(c => 
+        c.symbol?.toLowerCase() === symbol.toLowerCase()
+      ) : data.top_investment_coins.find(c => 
         c.symbol?.toLowerCase() === symbol.toLowerCase()
       );
       
@@ -435,8 +479,19 @@ Risk Factors:
 Sample Tweets:
 ${coin.sample_tweets?.length ? coin.sample_tweets.map(tweet => `• ${tweet}`).join('\n') : 'No sample tweets available'}
 
-Final Recommendation:
-${coin.recommendation || 'No recommendation available'}
+Investment Recommendation:
+${
+  coin.investment_score !== undefined ? 
+  (coin.investment_score > 15 ? 
+    `✅ STRONG BUY! TrendPup recommends investing in ${coin.symbol}! High investment score of ${coin.investment_score.toFixed(2)} indicates significant potential!` :
+    coin.investment_score > 5 ? 
+    `🟡 MODERATE BUY. TrendPup sees some potential in ${coin.symbol} with an investment score of ${coin.investment_score.toFixed(2)}. Consider a small position for diversification.` :
+    coin.investment_score > 0 ? 
+    `⚠️ SPECULATIVE ONLY. TrendPup thinks ${coin.symbol} is very risky with a low investment score of ${coin.investment_score.toFixed(2)}. Only invest small amounts you can afford to lose.` :
+    `❌ AVOID! TrendPup doesn't recommend investing in ${coin.symbol}. Negative investment score of ${coin.investment_score.toFixed(2)} indicates high risk with low reward potential.`
+  ) :
+  coin.recommendation || 'Based on the data, TrendPup recommends caution with this coin.'
+}
 
 Data Freshness:
 • Last Updated: ${new Date(data.analysis_timestamp).toLocaleString()}
@@ -454,12 +509,27 @@ Data Freshness:
     
     // First check if message mentions any known coins
     const mentionedCoins = await findCoinsInMessage(text);
-    if (mentionedCoins.length === 0) return false;
+    if (mentionedCoins.length === 0) {
+      const data = await readMemecoinsData();
+      if (data && data.top_investment_coins && Array.isArray(data.top_investment_coins)) {
+        // If no specific coin was mentioned but user is asking for investment advice,
+        // return true so we can respond with top coins
+        if (text.includes('invest') || text.includes('buy') || 
+            text.includes('recommend') || text.includes('best coin')) {
+          return true;
+        }
+      }
+      return false;
+    }
     
-    // Check for risk/investment related intent
+    // Check for risk/investment related intent with broader match
     return text.includes('risk') || text.includes('invest') || 
            text.includes('safe') || text.includes('buy') ||
-           text.includes('potential') || text.includes('should');
+           text.includes('potential') || text.includes('should') ||
+           text.includes('good') || text.includes('bad') ||
+           text.includes('worth') || text.includes('recommend') ||
+           text.includes('tell me about') || text.includes('what about') ||
+           text.includes('analysis') || text.includes('check');
   }
 };
 

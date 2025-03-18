@@ -1,57 +1,65 @@
 #!/bin/bash
 
-# Change to the script's directory
+# Get the script directory
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-cd "$SCRIPT_DIR"
 
 # Create screenshots directory if it doesn't exist
-mkdir -p "$SCRIPT_DIR/screenshots"
+# Screenshots are now disabled to save storage space
+# mkdir -p "$SCRIPT_DIR/screenshots"
 
-# Check if Xvfb is installed
-if ! command -v Xvfb &> /dev/null; then
-    echo "Xvfb is not installed. Installing now..."
-    sudo apt-get update
-    sudo apt-get install -y xvfb
-fi
-
-# Check if we already have an Xvfb instance running
-if pgrep -x "Xvfb" > /dev/null; then
-    echo "Xvfb is already running."
-else
-    echo "Starting Xvfb..."
-    # Start Xvfb on display :99 with screen resolution 1280x800x24
-    Xvfb :99 -screen 0 1280x800x24 -ac &
-    XVFB_PID=$!
-    
-    # Wait for Xvfb to initialize
-    sleep 2
-    
-    echo "Xvfb started with PID: $XVFB_PID"
-fi
-
-# Set the DISPLAY environment variable to the virtual display
+# Start Xvfb
 export DISPLAY=:99
+echo "Starting Xvfb on display $DISPLAY"
+Xvfb $DISPLAY -screen 0 1280x800x24 &
+XVFB_PID=$!
 
-echo "Using virtual display: $DISPLAY"
+# Ensure we kill Xvfb on script exit
+trap "echo 'Cleaning up processes...'; kill $XVFB_PID 2>/dev/null; echo 'Done.'" EXIT
 
-# Ensure the environment is active if using a virtualenv
-# Uncomment if using a virtual environment
-# source venv/bin/activate
+# Wait for Xvfb to start
+sleep 2
 
-# Install or update dependencies
-pip3 install -r requirements.txt
-
-echo "Starting Twitter scraper..."
-# Run the Twitter scraper
-python3 twitter_scraper.py
-
-# Cleanup - kill Xvfb process if we started it
-if [ -n "$XVFB_PID" ]; then
-    echo "Stopping Xvfb..."
-    kill $XVFB_PID
+# Check if Xvfb is running
+if ! ps -p $XVFB_PID > /dev/null; then
+    echo "Error: Xvfb failed to start"
+    exit 1
 fi
 
-# Inform about output locations
-echo "Twitter data saved to: $SCRIPT_DIR/twitter_coin_data.json"
-echo "Analysis saved to: $SCRIPT_DIR/coin_investment_analysis.json"
-echo "Screenshots saved to: $SCRIPT_DIR/screenshots" 
+echo "Xvfb started successfully with PID $XVFB_PID"
+
+# Create a log directory if it doesn't exist
+mkdir -p "$SCRIPT_DIR/logs"
+
+# Get current date-time for log file names
+DATETIME=$(date +"%Y%m%d_%H%M%S")
+LOG_FILE="$SCRIPT_DIR/logs/twitter_scraper_$DATETIME.log"
+
+# Display settings
+echo "Display settings:"
+echo "----------------"
+echo "DISPLAY=$DISPLAY"
+
+# Run Xrandr to verify display configuration
+if command -v xrandr >/dev/null 2>&1; then
+    echo "Display information from xrandr:"
+    XAUTHORITY=/root/.Xauthority xrandr || echo "xrandr command failed"
+else
+    echo "xrandr command not available"
+fi
+
+# Activate virtualenv if it exists
+if [ -d "$SCRIPT_DIR/venv" ]; then
+    echo "Activating virtual environment"
+    source "$SCRIPT_DIR/venv/bin/activate"
+fi
+
+# Run the Python script
+echo "Starting Twitter scraper..."
+cd "$SCRIPT_DIR"
+python3 twitter_scraper.py 2>&1 | tee -a "$LOG_FILE"
+
+# Print completion message
+echo "Twitter scraper completed"
+echo "Log saved to: $LOG_FILE"
+# Screenshots are now disabled to save storage space
+# echo "Screenshots saved to: $SCRIPT_DIR/screenshots" 

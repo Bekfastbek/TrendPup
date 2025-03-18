@@ -4,6 +4,14 @@ interface HelixCoin {
   volume: string;
   change_24h: string;
   timestamp: string;
+  market_id?: string;
+  market_name?: string;
+  tick_size?: string;
+  min_limit_order_size?: string;
+  volume_24h?: string;
+  high_24h?: string;
+  low_24h?: string;
+  helix_link?: string;
 }
 
 interface HelixDataResponse {
@@ -21,6 +29,12 @@ export interface FormattedMemecoin {
   risk: number;
   potential: number;
   favorite: boolean;
+  marketId?: string;
+  helixLink?: string;
+  tickSize?: string;
+  minOrderSize?: string;
+  high24h?: number;
+  low24h?: number;
 }
 
 // Function to parse price strings, handling various formats
@@ -77,7 +91,21 @@ const calculatePotential = (price: number, changeStr: string): number => {
   return Math.min(Math.round((changePotential * 0.5 + pricePotential * 0.5)), 10);
 };
 
-// Fallback data - sample of helix_data.json content
+// Helper function to parse price strings to numbers
+const parseNumericValue = (valueStr: string | undefined): number => {
+  if (!valueStr || valueStr === 'N/A') return 0;
+  
+  // Remove commas, currency symbols, and any non-numeric characters except dots
+  const cleaned = valueStr.replace(/,/g, '').replace(/[^\d.-]/g, '');
+  
+  // Parse the cleaned string
+  const value = parseFloat(cleaned);
+  
+  // If parsing fails or results in NaN, return 0
+  return isNaN(value) ? 0 : value;
+};
+
+// Fallback data - sample of helix_detailed_data.json content
 const fallbackData: HelixDataResponse = {
   data: [
     {
@@ -85,14 +113,23 @@ const fallbackData: HelixDataResponse = {
       "price": "1",
       "volume": "N/A",
       "change_24h": "+0.09%",
-      "timestamp": "2025-03-18T17:54:51.946Z"
+      "timestamp": "2025-03-18T17:54:51.946Z",
+      "market_id": "0x1b1e062b3306f26ae3af3c354a10c1cf38b00dcb42917f038ba3fc14978b1dd8",
+      "market_name": "hINJ/INJ",
+      "tick_size": "0.0001",
+      "min_limit_order_size": "0.001",
+      "volume_24h": "16,183.328 INJ",
+      "high_24h": "0.9941",
+      "low_24h": "0.9901",
+      "helix_link": "https://helixapp.com/spot/hinj-inj"
     },
     {
       "symbol": "STINJ/INJ",
       "price": "1.3816",
       "volume": "N/A",
       "change_24h": "+0.03%",
-      "timestamp": "2025-03-18T17:54:51.947Z"
+      "timestamp": "2025-03-18T17:54:51.947Z",
+      "market_id": "0x2a3e06be3b6c13730f801c66010b355c3d28d5bd4ee736eeabbfa56e0a735b58"
     },
     {
       "symbol": "HDRO/INJ",
@@ -137,7 +174,14 @@ const processHelixData = (data: HelixCoin[]): FormattedMemecoin[] => {
       marketCap: Math.round(price * 1000000 * (Math.random() * 5 + 1)), // Generate random market cap
       risk: calculateRisk(price, coin.change_24h),
       potential: calculatePotential(price, coin.change_24h),
-      favorite: false
+      favorite: false,
+      // Add the new detailed data fields if available
+      marketId: coin.market_id,
+      helixLink: coin.helix_link,
+      tickSize: coin.tick_size,
+      minOrderSize: coin.min_limit_order_size,
+      high24h: parseNumericValue(coin.high_24h),
+      low24h: parseNumericValue(coin.low_24h)
     };
   });
 };

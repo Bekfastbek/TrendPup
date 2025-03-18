@@ -447,113 +447,157 @@ def analyze_coin_data(helix_data, twitter_data):
     return top_coins
 
 async def scrape_twitter_for_coins():
-    """Main function to scrape Twitter for coin data"""
-    # Load helix data
+    """Scrape Twitter for the coin data from the loaded coins list"""
+    start_time = time.time()
+    
     helix_data = load_helix_data()
     if not helix_data:
-        logger.error("Failed to load helix data, exiting")
-        return False
+        logger.error("No helix data found. Please run helix_scraper.py first.")
+        return
     
-    # Extract coin symbols
     coin_symbols = extract_coin_symbols(helix_data)
     if not coin_symbols:
-        logger.error("No coin symbols found in helix data, exiting")
-        return False
+        logger.error("No coin symbols found in helix data.")
+        return
     
-    all_tweets = []
+    logger.info(f"Starting Twitter scraper for {len(coin_symbols)} coins")
     
     async with async_playwright() as p:
-        # Launch browser options - configured for virtual X server
         browser_launch_options = {
-            "headless": False,  # Use "headed" mode with virtual X server
-            "timeout": 120000,  # Increase timeout to 2 minutes
+            "headless": False,
+            "timeout": 120000,  # 2 minute timeout for launch
             "args": [
                 "--disable-web-security",
                 "--disable-features=IsolateOrigins",
                 "--disable-site-isolation-trials",
                 "--no-sandbox",
-                "--disable-dev-shm-usage",
-                "--disable-gpu",  # Disable GPU acceleration
-                "--mute-audio",   # Mute audio to avoid issues
-                "--window-size=1280,800"  # Set window size
+                "--disable-dev-shm-usage"
             ]
         }
         
-        logger.info("Launching browser in headed mode with virtual X server")
+        logger.info(f"Launching browser with options: {browser_launch_options}")
         browser = await p.chromium.launch(**browser_launch_options)
+        
         context = await browser.new_context(
             viewport={"width": 1280, "height": 800},
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/99.0.4844.51 Safari/537.36"
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
         )
         
-        # Take screenshots for debugging
-        screenshot_dir = os.path.join(SCRIPT_DIR, "screenshots")
-        os.makedirs(screenshot_dir, exist_ok=True)
+        # Longer timeout for all operations (2 minutes)
+        context.set_default_timeout(120000)
         
         # Load cookies
         cookies_loaded = await load_cookies(context)
         if not cookies_loaded:
-            logger.error("Failed to load cookies, exiting")
+            logger.error("Failed to load cookies. Please check the cookies file.")
             await browser.close()
-            return False
+            return
         
         # Create a new page
         page = await context.new_page()
         
+        # Initialize result storage
+        twitter_data = {}
+        processed_count = 0
+        error_count = 0
+        
+        # Take screenshots for debugging
+        # Disabling screenshots to save storage space
+        # screenshot_dir = os.path.join(SCRIPT_DIR, "screenshots")
+        # os.makedirs(screenshot_dir, exist_ok=True)
+        
         try:
-            # First visit Twitter search page directly instead of homepage
-            # This is less likely to trigger login requirements or timeouts
-            general_search_url = "https://twitter.com/search?q=crypto&src=typed_query&f=live"
-            logger.info("Visiting Twitter search page to initialize session")
+            # Go to Twitter first to ensure we're properly logged in
+            logger.info("Navigating to Twitter homepage")
+            await page.goto("https://twitter.com/home", timeout=120000)
             
+            # Wait for the page to load
             try:
-                await page.goto(general_search_url, timeout=120000)  # Increase timeout to 2 minutes
-                
-                # Use a more lenient approach to wait for page load
-                try:
-                    await page.wait_for_load_state('domcontentloaded', timeout=30000)
-                    logger.info("Twitter search page DOM loaded")
-                except TimeoutError:
-                    logger.warning("Timeout waiting for page load state, continuing anyway")
-                
-                # Wait for some content to appear
-                await asyncio.sleep(5)  # Give the page a moment to initialize
-                
-                # Take a screenshot after initial page load
-                await page.screenshot(path=os.path.join(screenshot_dir, "twitter_initial.png"))
-                logger.info(f"Saved initial screenshot")
-            except Exception as e:
-                logger.warning(f"Issue with initial page load: {e}")
-                logger.info("Will attempt to continue with searches anyway")
+                await page.wait_for_selector("article", timeout=30000)
+                logger.info("Twitter homepage loaded successfully")
+            except TimeoutError:
+                logger.warning("Twitter timeline articles not found within timeout")
+                logger.info("Continuing anyway, may not be logged in properly")
             
-            # Scrape data for each coin
-            processed_count = 0
+            # Pause to ensure page is fully loaded
+            await asyncio.sleep(5)
+            
+            # Take a screenshot after initial page load
+            # Disabling screenshot to save storage space
+            # await page.screenshot(path=os.path.join(screenshot_dir, "twitter_initial.png"))
+            # logger.info(f"Saved initial screenshot")
+            
+            # Process each coin symbol
             for coin in coin_symbols:
-                if not coin:
-                    continue
+                logger.info(f"Processing coin {coin} ({processed_count + 1}/{len(coin_symbols)})")
                 
                 try:
+                    # Only take screenshots for some coins to avoid disk space issues
+                    # Disabling screenshots to save storage space
+                    # if processed_count % 5 == 0:  # Take screenshot every 5 coins
+                    #     try:
+                    #         await page.screenshot(path=os.path.join(screenshot_dir, f"search_{coin}.png"))
+                    #     except Exception as e:
+                    #         logger.warning(f"Failed to take screenshot for {coin}: {e}")
+                    
+                    # Search Twitter for this coin
                     tweets = await search_twitter_for_coin(page, coin)
                     
-                    # Only take screenshots for some coins to avoid disk space issues
-                    if processed_count % 5 == 0:  # Take screenshot every 5 coins
+                    if tweets:
+                        logger.info(f"Found {len(tweets)} tweets for {coin}")
+                        
+                        # Store the tweets in our result
+                        twitter_data[coin] = tweets
+                        
+                        # Analyze tweets with Gemini
+                        tweets_text = "\n\n".join([t["text"] for t in tweets])
                         try:
-                            await page.screenshot(path=os.path.join(screenshot_dir, f"search_{coin}.png"))
+                            # Only analyze if we have tweets
+                            if tweets_text.strip():
+                                # Apply rate limiting for API key usage
+                                analysis = analyze_sentiment_with_gemini(tweets_text, coin)
+                                
+                                if analysis:
+                                    logger.info(f"Analyzed {len(tweets)} tweets for {coin}")
+                                    
+                                    # Update the twitter data with the analysis
+                                    twitter_data[coin] = [
+                                        {**tweet, "analyzed": True}
+                                        for tweet in twitter_data[coin]
+                                    ]
+                                    
+                                    # Add analysis to the coin data
+                                    twitter_data[f"{coin}_analysis"] = {
+                                        "sentiment_score": analysis["sentiment_score"],
+                                        "gemini_analysis": analysis["gemini_analysis"],
+                                        "key_factors": analysis["key_factors"],
+                                    }
+                                else:
+                                    logger.warning(f"Failed to analyze tweets for {coin}")
                         except Exception as e:
-                            logger.warning(f"Failed to take screenshot for {coin}: {e}")
+                            logger.error(f"Error analyzing tweets for {coin}: {e}")
                     
-                    all_tweets.extend(tweets)
                     processed_count += 1
                     
-                    # Log progress periodically
-                    if processed_count % 10 == 0:
-                        logger.info(f"Processed {processed_count}/{len(coin_symbols)} coins, found {len(all_tweets)} tweets so far")
+                    # Save progress incrementally
+                    if processed_count % 5 == 0 or processed_count == len(coin_symbols):
+                        with open(TWITTER_DATA_FILE, 'w') as f:
+                            json.dump(twitter_data, f, indent=2)
+                        logger.info(f"Saved data for {processed_count}/{len(coin_symbols)} coins processed so far")
+                    
+                    # Random delay between requests (2-5 seconds)
+                    delay = random.uniform(2, 5)
+                    logger.info(f"Waiting {delay:.2f} seconds before next request")
+                    await asyncio.sleep(delay)
+                    
                 except Exception as e:
                     logger.error(f"Error processing coin {coin}: {e}")
-                    # Continue with next coin
-                
-                # Add a short delay between requests to avoid rate limiting
-                await asyncio.sleep(3)  # Increase delay between requests
+                    error_count += 1
+                    
+                    # If we get too many errors, break out to avoid wasting time
+                    if error_count > 10:
+                        logger.error(f"Too many errors ({error_count}), stopping processing")
+                        break
         except Exception as e:
             logger.error(f"Error during scraping: {e}")
         finally:
@@ -564,23 +608,17 @@ async def scrape_twitter_for_coins():
             except Exception as e:
                 logger.error(f"Error closing browser: {e}")
     
-    # Save all tweets to file
-    with open(TWITTER_DATA_FILE, 'w', encoding='utf-8') as f:
-        json.dump(all_tweets, f, indent=2, ensure_ascii=False)
-    
-    logger.info(f"Saved {len(all_tweets)} tweets to {TWITTER_DATA_FILE}")
-    
     # Analyze the data if we have tweets
-    if all_tweets:
+    if twitter_data:
         logger.info("Starting coin analysis with Gemini API")
-        top_coins = analyze_coin_data(helix_data, all_tweets)
+        top_coins = analyze_coin_data(helix_data, twitter_data)
         
         # Save analysis results
         analysis_result = {
             "top_investment_coins": top_coins,
             "analysis_timestamp": datetime.now().isoformat(),
             "total_coins_analyzed": len(coin_symbols),
-            "total_tweets_analyzed": len(all_tweets)
+            "total_tweets_analyzed": sum(len(tweets) for tweets in twitter_data.values())
         }
         
         with open(ANALYSIS_OUTPUT_FILE, 'w', encoding='utf-8') as f:
